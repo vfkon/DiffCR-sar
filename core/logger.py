@@ -112,7 +112,7 @@ class VisualWriter():
                 if os.path.exists(os.path.join(result_path, names[i])):
                     pass
                 else:
-                    Image.fromarray(outputs[i]).save(os.path.join(result_path, names[i]))
+                    Image.fromarray(outputs[i][[2,1,0]]).save(os.path.join(result_path, names[i]))
         except:
             raise NotImplementedError('You must specify the context of name and result in save_current_results functions of model.')
 

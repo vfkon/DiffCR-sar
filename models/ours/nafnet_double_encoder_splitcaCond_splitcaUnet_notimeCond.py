@@ -255,6 +255,7 @@ class NAFBlock(EmbedBlock):
         return y + x * self.gamma
 
 
+
 class UNet(nn.Module):
 
     def __init__(
@@ -269,7 +270,7 @@ class UNet(nn.Module):
 
         self.intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
-        self.cond_intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+        self.cond_intro = nn.Conv2d(in_channels=img_channel + 2, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
         self.ending = nn.Conv2d(in_channels=width, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
                                 bias=True)
@@ -339,10 +340,10 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        x1, x2, x3, x = inp.chunk(4, dim=1) #split input into 4 chunks
-        cond = torch.stack([x1, x2, x3], dim=1)#stack conditional chunks adding additional dimension
-        b, n, c, h, w = cond.shape
-        cond = cond.view(b*n, c, h, w)#reshape
+        cond, x = inp[:,3:],inp[:,:3]  #split input into 4 chunks
+        #cond = torch.stack([x1, x2, x3], dim=1)#stack conditional chunks adding additional dimension
+        #b, n, c, h, w = cond.shape
+        #cond = cond.view(b*n, c, h, w)#reshape
         x = self.intro(x) #1x1 convolution
         cond = self.cond_intro(cond)#1x1 convolution
 
@@ -352,9 +353,9 @@ class UNet(nn.Module):
         for encoder, down, cond_encoder, cond_down in zip(self.encoders, self.downs, self.cond_encoders, self.cond_downs):
             x = encoder(x, t)
             cond = cond_encoder(cond)
-            b, c, h, w = cond.shape
-            tmp_cond = cond.view(b//3, 3, c, h, w).sum(dim=1)
-            x = x + tmp_cond
+            #b, c, h, w = cond.shape
+            #tmp_cond = cond.view(b//3, 3, c, h, w).sum(dim=1)
+            #x = x + tmp_cond
             encs.append(x)
             x = down(x)
             cond = cond_down(cond)

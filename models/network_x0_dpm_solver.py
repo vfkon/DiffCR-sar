@@ -9,6 +9,7 @@ from core.dpm_solver_pytorch import NoiseScheduleVP, model_wrapper, DPM_Solver
 class Network(BaseNetwork):
     def __init__(self, unet, beta_schedule, module_name='sr3', **kwargs):
         super(Network, self).__init__(**kwargs)
+        print(module_name)
         if module_name == 'sr3':
             from .sr3_modules.unet import UNet
         elif module_name == 'guided_diffusion':
@@ -43,12 +44,15 @@ class Network(BaseNetwork):
             from .ours.ours_sum_no_condskip_nodrop_noparams_splitca_double_encoder_decoder_noCondFFN_middle_fusion import UNet
         elif module_name == "ours_concat_no_condskip_nodrop_noparams_splitca_double_encoder_decoder_middle_fusion":
             from .ours.ours_concat_no_condskip_nodrop_noparams_splitca_double_encoder_decoder_middle_fusion import UNet
-        elif module_name == "ours_double_encoder_splitcaCond_splitcaUnet":
-            from .ours.ours_double_encoder_splitcaCond_splitcaUnet import UNet
+        elif module_name == "nafnet_double_encoder_splitcaCond_splitcaUnet":
+            print('imported successfully')
+            from .ours.nafnet_double_encoder_splitcaCond_splitcaUnet import UNet
         elif module_name == "ours_double_encoder_splitcaCond":
             from .ours.ours_double_encoder_splitcaCond import UNet
         elif module_name == "ours_double_encoder_splitcaUnet":
             from .ours.ours_double_encoder_splitcaUnet import UNet
+        elif module_name == 'nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond':
+            from .ours.nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond import UNet
         self.denoise_fn = UNet(**unet)
         self.beta_schedule = beta_schedule
 
@@ -58,6 +62,7 @@ class Network(BaseNetwork):
     def set_new_noise_schedule(self, device=torch.device('cuda'), phase='train'):
         to_torch = partial(torch.tensor, dtype=torch.float32, device=device)
         betas = make_beta_schedule(**self.beta_schedule[phase])
+        print(betas)
         betas = betas.detach().cpu().numpy() if isinstance(
             betas, torch.Tensor) else betas
         self.betas = betas

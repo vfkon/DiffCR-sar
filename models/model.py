@@ -77,8 +77,8 @@ class Palette(BaseModel):
     
     def get_current_visuals(self, phase='train'):
         dict = {
-            'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:].float().cpu()],
-            # 'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:].float().cpu()],
+            'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:,[2,1,0]].float().cpu()],
+            'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,[2,1,0]].float().cpu()],
         }
         if self.task in ['inpainting','uncropping']:
             dict.update({
@@ -87,7 +87,7 @@ class Palette(BaseModel):
             })
         if phase != 'train':
             dict.update({
-                'output': [self.get_rgb_tensor(i) for i in self.output.detach()[:].float().cpu()]
+                'output': [self.get_rgb_tensor(i) for i in self.output.detach()[:,[2,1,0]].float().cpu()]
             })
         return dict
 
@@ -98,8 +98,8 @@ class Palette(BaseModel):
             ret_path.append('GT_{}'.format(self.path[idx]))
             ret_result.append(self.gt_image[idx].detach().float().cpu())
 
-            # ret_path.append('Cond_{}'.format(self.path[idx]))
-            # ret_result.append(self.cond_image[idx].detach().float().cpu())
+            ret_path.append('Cond_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx].detach().float().cpu())
 
             # ret_path.append('Process_{}'.format(self.path[idx]))
             # ret_result.append(self.visuals[idx::self.batch_size].detach().float().cpu())
