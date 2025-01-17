@@ -40,7 +40,7 @@ class BaseModel():
             self.epoch += 1
             if self.opt['distributed']:
                 ''' sets the epoch for this sampler. When :attr:`shuffle=True`, this ensures all replicas use a different random ordering for each epoch '''
-                self.phase_loader.sampler.set_epoch(self.epoch) 
+                self.phase_loader.sampler.set_epoch(self.epoch)
 
             train_log = self.train_step()
 
@@ -110,7 +110,10 @@ class BaseModel():
             return 
         self.logger.info('Beign loading pretrained model [{:s}] ...'.format(network_label))
 
-        model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], 'diffcr_new')
+        if 'ema' in network_label:
+            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '120_Network_ema')
+        else:
+            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '120_Network')
         
         if not os.path.exists(model_path):
             self.logger.warning('Pretrained model in [{:s}] is not existed, Skip it'.format(model_path))
@@ -142,7 +145,7 @@ class BaseModel():
         self.logger.info('Beign loading training states'.format())
         assert isinstance(self.optimizers, list) and isinstance(self.schedulers, list), 'optimizers and schedulers must be a list.'
         
-        state_path = "{}.state".format(self. opt['path']['resume_state'])
+        state_path = "{}/120.state".format(self. opt['path']['resume_state'])
         
         if not os.path.exists(state_path):
             self.logger.warning('Training state in [{:s}] is not existed, Skip it'.format(state_path))

@@ -68,17 +68,26 @@ class Palette(BaseModel):
     def get_rgb_tensor(self, rgb):
         rgb = rgb*0.5+0.5
         rgb = rgb - torch.min(rgb)
+        print(rgb.min())
+        print(rgb.max())
+
         # treat saturated images, scale values
         if torch.max(rgb) == 0:
             rgb = 255 * torch.ones_like(rgb)
         else:
             rgb = 255 * (rgb / torch.max(rgb))
+        if rgb.shape[0]==1:
+            rgb = torch.concat([rgb,rgb,rgb],dim=0)
         return rgb.type(torch.uint8)
     
     def get_current_visuals(self, phase='train'):
+        self.cond_image.detach()[:, [4]].float().cpu()
         dict = {
-            'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:,[2,1,0]].float().cpu()],
-            'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,[2,1,0]].float().cpu()],
+            'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:,[0,1,2]].float().cpu()],
+            'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,[0,1,2]].float().cpu()],
+
+            'sar_imagevv' :[self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:4].float().cpu()],
+            'sar_imagevh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,4:5].float().cpu()]
         }
         if self.task in ['inpainting','uncropping']:
             dict.update({
@@ -87,7 +96,7 @@ class Palette(BaseModel):
             })
         if phase != 'train':
             dict.update({
-                'output': [self.get_rgb_tensor(i) for i in self.output.detach()[:,[2,1,0]].float().cpu()]
+                'output': [self.get_rgb_tensor(i) for i in self.output.detach()[:,[0,1,2]].float().cpu()]
             })
         return dict
 

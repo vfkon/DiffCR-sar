@@ -6,12 +6,12 @@
     "seed": -1,
     "finetune_norm": false,
     "path": {
-        "base_dir": "experiments",
+        "base_dir": "/media/vkon/hdd-data/diffcr-results",
         "code": "code",
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
-        "resume_state": null
+        "resume_state": ""
     },
     "datasets": {
         "train": {
@@ -29,7 +29,7 @@
                 "validation_split": 2,
                 "args": {
                     "batch_size": 12,
-                    "num_workers": 8,
+                    "num_workers": 12,
                     "shuffle": true,
                     "pin_memory": true,
                     "drop_last": true
@@ -140,8 +140,8 @@
     "train": {
         "n_epoch": 3000,
         "n_iter": 100000000,
-        "val_epoch": 50,
-        "save_checkpoint_epoch": 25,
+        "val_epoch": 20,
+        "save_checkpoint_epoch": 20,
         "log_iter": 10000,
         "tensorboard": true
     },

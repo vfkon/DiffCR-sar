@@ -238,7 +238,7 @@ def get_display_channels(use_s2hr, use_s2mr, use_s2lr):
         display_channels = [3, 2, 1]
         brightness_factor = 3
     elif use_s2hr:
-        display_channels = [0, 1, 2]
+        display_channels = [2, 1, 0]
         brightness_factor = 3
     elif not (use_s2hr or use_s2mr or use_s2lr):
         display_channels = 0
@@ -369,9 +369,9 @@ class SEN12MS(data.Dataset):
                            self.use_s2lr, self.use_s2cr, no_savanna=self.no_savanna,
                            igbp=True, unlabeled=True)
         ret = {}
-        ret['gt_image'] = image_clear[[3,2,1],:,:]
+        ret['gt_image'] = image_clear[[2,1,0],:,:]
         #ret['cond_image_sar'] = image_sar
-        ret['cond_image'] = torch.cat([image_cloud[[3,2,1],:,:], image_sar], dim = 0)
+        ret['cond_image'] = torch.cat([image_cloud[[2,1,0],:,:], image_sar], dim = 0)
         ret['path'] = sample['id']
         return ret
 
