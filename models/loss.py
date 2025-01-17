@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-
+from pytorch_msssim import ssim
 # class mse_loss(nn.Module):
 #     def __init__(self) -> None:
 #         super().__init__()
@@ -12,12 +12,23 @@ from torch.autograd import Variable
 
 
 def mse_loss(output, target):
-    return F.mse_loss(output, target)
-
+    return {'total':F.mse_loss(output, target)}
 
 def l1_loss(output, target):
-    return F.l1_loss(output, target)
+    return {'total':F.l1_loss(output, target)}
 
+def ssim_loss(output, target):
+    with torch.no_grad():
+        ssim_loss = 1 - ssim((output+1)/2, (target+1)/2, data_range=1, size_average=True)
+    return {'total':ssim_loss}
+
+def ssim_mse_loss(output, target, coef = 20):
+    """
+    coef: rate for mse loss
+    """
+    mseloss = mse_loss(output, target)['total']
+    ssimloss = ssim_loss(output,target)['total']* coef
+    return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'total': mseloss+ssimloss, 'ssim_mse_loss': mseloss+ssimloss }
 
 class FocalLoss(nn.Module):
     def __init__(self, gamma=2, alpha=None, size_average=True):

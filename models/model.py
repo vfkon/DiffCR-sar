@@ -130,12 +130,14 @@ class Palette(BaseModel):
             self.set_input(train_data)
             self.optG.zero_grad()
             loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
-            loss.backward()
+            loss['total'].backward()
+            loss.pop('total')
             self.optG.step()
 
             self.iter += self.batch_size
             self.writer.set_iter(self.epoch, self.iter, phase='train')
-            self.train_metrics.update(self.loss_fn.__name__, loss.item())
+            for key, value in loss.items():
+                self.train_metrics.update(key, value)
             if self.iter % self.opt['train']['log_iter'] == 0:
                 for key, value in self.train_metrics.result().items():
                     self.logger.info('{:5s}: {}\t'.format(str(key), value))
