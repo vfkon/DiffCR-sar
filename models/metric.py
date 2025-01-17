@@ -5,7 +5,7 @@ from torch.nn import functional as F
 import torch.utils.data
 
 from torchvision.models.inception import inception_v3
-
+from pytorch_msssim import ssim
 import numpy as np
 from scipy.stats import entropy
 
@@ -14,6 +14,11 @@ def mae(input, target):
         loss = nn.L1Loss()
         output = loss(input, target)
     return output
+
+def ssim_metric(input, target):
+    with torch.no_grad():
+        ssim_loss = ssim((input+1)/2, (target+1)/2, data_range=1, size_average=True)
+    return ssim_loss
 
 
 def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):

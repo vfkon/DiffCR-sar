@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Subset
 
 import core.util as Util
 from core.praser import init_obj
-from data.dataset import Sen2_MTC_New_Multi, Sen2_MTC_New_Single, SEN12MS
+from data.dataset import Sen2_MTC_New_Multi, Sen2_MTC_New_Single, SEN12MS, SEN12OPTMS
 
 
 def define_dataloader(logger, opt):
@@ -39,12 +39,12 @@ def define_dataset(logger, opt):
     ''' loading Dataset() class from given file's name '''
     dataset_opt = opt['datasets'][opt['phase']]['which_dataset']
     #phase_dataset = init_obj(dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')
-    phase_dataset = SEN12MS(opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
+    phase_dataset = SEN12OPTMS(opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
                                        dataset_opt['args']['mode'])
     #val_dataset = None
     val_dataset_opt = opt['datasets']['val']['which_dataset']
     #val_dataset = init_obj(val_dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')
-    val_dataset = SEN12MS(opt['datasets']['val']['which_dataset']['args']['data_root'],
+    val_dataset = SEN12OPTMS(opt['datasets']['val']['which_dataset']['args']['data_root'],
                                        'val')
     valid_len = 0
     data_len = len(phase_dataset)

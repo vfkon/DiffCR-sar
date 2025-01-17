@@ -1,4 +1,5 @@
 import torch.utils.data as data
+import torchvision.transforms
 from torchvision import transforms
 from PIL import Image
 import os
@@ -160,6 +161,8 @@ def load_sample(sample, use_s1, use_s2hr, use_s2mr, use_s2lr, use_s2_cr,
         label = None
     return image_cr, image_sar, image, label
 
+# util function for reading data from single sample
+
 
 
 # calculate number of input channels
@@ -231,6 +234,13 @@ def get_ninputs(use_s1, use_s2hr, use_s2mr, use_s2lr):
         n_inputs += 2
     return n_inputs
 
+def get_ninputs_opt(use_s1, use_s2):
+    n_inputs = 0
+    if use_s2:
+        n_inputs += 3
+    if use_s1:
+        n_inputs += 3
+    return n_inputs
 
 # select channels for preview images
 def get_display_channels(use_s2hr, use_s2mr, use_s2lr):
@@ -247,6 +257,17 @@ def get_display_channels(use_s2hr, use_s2mr, use_s2lr):
         display_channels = 0
         brightness_factor = 3
     return (display_channels, brightness_factor)
+
+def get_display_channels_opt(use_s2, use_s1):
+    if use_s2:
+        display_channels = [0,1,2]
+        brightness_factor = 3
+    else:
+        display_channels = 0
+        brightness_factor = 3
+    return (display_channels, brightness_factor)
+
+
 
 
 class SEN12MS(data.Dataset):
@@ -380,17 +401,155 @@ class SEN12MS(data.Dataset):
         """Get number of samples in the dataset"""
         return len(self.samples)
 
-class SEN2_MTC_Ada(data.Dataset):
-    def __init__(self, dataset_to_adapt:SEN12MS):
-        self.data = dataset_to_adapt
+class SEN12OPTMS(data.Dataset):
+    """PyTorch dataset class for the SEN12MS dataset"""
+    # expects dataset dir as:
+    #       - SEN12MS_holdOutScenes.txt
+    #       - ROIsxxxx_y
+    #           - lc_n
+    #           - s1_n
+    #           - s2_n
+    #
+    # SEN12SEN12MS_holdOutScenes.txt contains the subdirs for the official
+    # train/val split and can be obtained from:
+    #   https://github.com/MSchmitt1984/SEN12MS/blob/master/splits
 
-    def __len__(self):
-        return len(self.data)
+    def __init__(self, path, mode="train", no_savanna=False, use_s2=True, use_s2cr=True, use_s1=True):
+        """Initialize the dataset"""
+
+        # inizialize
+        super(SEN12OPTMS, self).__init__()
+
+        # make sure parameters are okay
+        if not (use_s2 or use_s2cr or use_s1):
+            raise ValueError("No input specified, set at least one of "
+                             + "use_[s2hr, s2mr, s2lr, s1] to True!")
+        self.use_s2 = use_s2
+        self.use_s2cr = use_s2cr
+        self.use_s1 = use_s1
+        assert mode in ["train", "val"]
+        self.mode = mode
+        # provide number of input channels
+        self.n_inputs = get_ninputs_opt(use_s1, use_s2)
+
+        # provide index of channel(s) suitable for previewing the input
+        self.display_channels, self.brightness_factor = get_display_channels_opt(
+                                                            use_s2, use_s1)
+
+        # make sure parent dir exists
+        assert os.path.exists(path)
+
+        # find and index samples
+        self.samples = []
+        if mode == "train":
+            pbar = tqdm(total=162556)   # we expect 541,986 / 3 * 0.9 samples
+        else:
+            pbar = tqdm(total=18106)   # we expect 541,986 / 3 * 0.1 samples
+        pbar.set_description("[Load]")
+
+        val_list = list(pd.read_csv(os.path.join(path,
+                                                 "SEN12MS_holdOutScenes.txt"),
+                                    header=None)[0])
+        val_list = [x.replace("s1_", "s2_") for x in val_list]
+        val_list = [x.replace('_s1', '_s2') for x in val_list]
+        # compile a list of paths to all samples
+        if mode == "train":
+            train_list = []
+            for seasonfolder in ['ROIs1970_fall_s2', 'ROIs1158_spring_s2',
+                                 'ROIs2017_winter_s2', 'ROIs1868_summer_s2']:
+                train_list += [os.path.join(seasonfolder, x) for x in
+                               os.listdir(os.path.join(path, seasonfolder))]
+            train_list = [x for x in train_list if "s2_" in x]
+            train_list = [x for x in train_list if x not in val_list]
+            sample_dirs = train_list
+        elif mode == "val":
+            sample_dirs = val_list
+
+        for folder in sample_dirs:
+            s2_locations = glob.glob(os.path.join(path, f"{folder}/*.png"),
+                                     recursive=True)
+
+            # INFO there is one "broken" file in the sen12ms dataset with nan
+            #      values in the s1 data. we simply ignore this specific sample
+            #      at this point. id: ROIs1868_summer_xx_146_p202
+            if folder == "ROIs1868_summer/s2_146":
+                broken_file = os.path.join(path, "ROIs1868_summer",
+                                           "s2_146",
+                                           "ROIs1868_summer_s2_146_p202.png")
+                s2_locations.remove(broken_file)
+                pbar.write("ignored one sample because of nan values in "
+                           + "the s1 data")
+
+            for s2_loc in s2_locations:
+                s1_loc = s2_loc.replace("_s2_", "_s1_").replace("s2_", "s1_").replace('_s2',
+                                                                                                      '_s1')
+                s2cr_loc = s1_loc.replace('_s1', '_s2_cloudy').replace("_s1_", "_s2_cloudy_").replace("s1_", "s2_cloudy_")
+                lc_loc = s2_loc.replace('_s2', '_lc').replace("_s2_", "_lc_").replace("s2_", "lc_")
+
+                pbar.update()
+                self.samples.append({"label": lc_loc, "s1": s1_loc, "s2": s2_loc, "s2cr": s2cr_loc,
+                                     "id": os.path.basename(s2_loc)})
+
+        pbar.close()
+
+        # sort list of samples
+        self.samples = sorted(self.samples, key=lambda i: i['id'])
+
+        print("loaded", len(self.samples),
+              "samples from the sen12ms subset", mode)
+        self.augment_rotation_param = np.random.randint(
+            0, 4, len(self.samples))
+        self.augment_flip_param = np.random.randint(0, 3, len(self.samples))
+        self.index = 0
 
     def __getitem__(self, index):
-        data = self.data.__getitem__(index)
-        ret = {}
+        """Get a single example from the dataset"""
 
+        # get and load sample from index file
+        sample = self.samples[index]
+        image_cloud = self.load_sample_opt(sample['s2cr'])
+        image_clear = self.load_sample_opt(sample['s2'])
+        image_sar = self.load_sample_opt(sample['s1'])
+
+        ret = {}
+        ret['gt_image'] = image_clear
+        #ret['cond_image_sar'] = image_sar
+        ret['cond_image'] = torch.cat([image_cloud, image_sar], dim = 0)
+        ret['path'] = sample['id']
+        return ret
+
+    def load_sample_opt(self, path):
+
+        img = np.array(Image.open(path)).transpose((2,0,1))
+        if self.mode == 'train':
+            if not self.augment_flip_param[self.index // 4] == 0:
+                img = np.flip(img, self.augment_flip_param[self.index // 4])
+            if not self.augment_rotation_param[self.index // 4] == 0:
+                img = np.rot90(
+                    img, self.augment_rotation_param[self.index // 4], (1, 2))
+            self.index += 1
+
+        if self.index // 4 >= len(self.samples):
+            self.index = 0
+
+        image = torch.tensor(img.copy())
+        image = image / 255.0
+        mean = torch.as_tensor([0.5, 0.5, 0.5],
+                               dtype=image.dtype, device=image.device)
+        std = torch.as_tensor([0.5, 0.5, 0.5],
+                              dtype=image.dtype, device=image.device)
+        if mean.ndim == 1:
+            mean = mean.view(-1, 1, 1)
+        if std.ndim == 1:
+            std = std.view(-1, 1, 1)
+        image.sub_(mean).div_(std)
+
+        return image
+
+
+    def __len__(self):
+        """Get number of samples in the dataset"""
+        return len(self.samples)
 
 
 """class Sen2_MTC_New_SAR(data.Dataset):

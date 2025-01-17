@@ -53,6 +53,8 @@ class Network(BaseNetwork):
             from .ours.ours_double_encoder_splitcaUnet import UNet
         elif module_name == 'nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond':
             from .ours.nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond import UNet
+        elif module_name == 'mine_3chan_sar_single_enc':
+            from .ours.mine_3chan_sar_single_enc import UNet
         self.denoise_fn = UNet(**unet)
         self.beta_schedule = beta_schedule
 
@@ -185,11 +187,11 @@ class Network(BaseNetwork):
 
         if mask is not None:
             noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy*mask+(1.-mask)*y_0], dim=1), sample_gammas)
-            loss = self.loss_fn(mask*noise, mask*noise_hat)
+            losses = self.loss_fn(mask*noise, mask*noise_hat)
         else:
             y_0_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
-            loss = self.loss_fn(y_0, y_0_hat)
-        return loss
+            losses = self.loss_fn(y_0, y_0_hat)
+        return losses
 
 
 # gaussian diffusion trainer class
