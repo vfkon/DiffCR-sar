@@ -39,8 +39,8 @@ def define_dataset(logger, opt):
     ''' loading Dataset() class from given file's name '''
     dataset_opt = opt['datasets'][opt['phase']]['which_dataset']
     #phase_dataset = init_obj(dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')
-    phase_dataset = SEN12OPTMS(opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
-                                       dataset_opt['args']['mode'])
+    phase_dataset = SEN12OPTMS(path = opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
+                                       mode = dataset_opt['args']['mode'], rand_use = dataset_opt['args']['rand_use'])
     #val_dataset = None
     val_dataset_opt = opt['datasets']['val']['which_dataset']
     #val_dataset = init_obj(val_dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')

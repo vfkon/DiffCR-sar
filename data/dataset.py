@@ -414,7 +414,7 @@ class SEN12OPTMS(data.Dataset):
     # train/val split and can be obtained from:
     #   https://github.com/MSchmitt1984/SEN12MS/blob/master/splits
 
-    def __init__(self, path, mode="train", no_savanna=False, use_s2=True, use_s2cr=True, use_s1=True):
+    def __init__(self, path, augmentation = False, mode="train", rand_use = 0.0, use_s2=True, use_s2cr=True, use_s1=True):
         """Initialize the dataset"""
 
         # inizialize
@@ -429,6 +429,8 @@ class SEN12OPTMS(data.Dataset):
         self.use_s1 = use_s1
         assert mode in ["train", "val"]
         self.mode = mode
+        self.rand_use = rand_use if mode == "train" else 0.0
+        self.augmentation = augmentation
         # provide number of input channels
         self.n_inputs = get_ninputs_opt(use_s1, use_s2)
 
@@ -499,6 +501,10 @@ class SEN12OPTMS(data.Dataset):
               "samples from the sen12ms subset", mode)
         self.augment_rotation_param = np.random.randint(
             0, 4, len(self.samples))
+        #if self.rand_use:
+        #    self.what_to_use = np.random.randint(0,4, len(self.samples))
+        self.augment_rotation_param = np.random.randint(
+            0, 4, len(self.samples))
         self.augment_flip_param = np.random.randint(0, 3, len(self.samples))
         self.index = 0
 
@@ -507,10 +513,17 @@ class SEN12OPTMS(data.Dataset):
 
         # get and load sample from index file
         sample = self.samples[index]
-        image_cloud = self.load_sample_opt(sample['s2cr'])
         image_clear = self.load_sample_opt(sample['s2'])
-        image_sar = self.load_sample_opt(sample['s1'])
-
+        if np.random.random_sample() < self.rand_use:
+            if np.random.random_sample() < 0.5:
+                image_cloud = self.load_sample_opt(sample['s2cr'])
+                image_sar = torch.tensor(np.zeros_like(image_cloud, dtype=np.float32))
+            else:
+                image_sar = self.load_sample_opt(sample['s1'])
+                image_cloud = torch.tensor(np.zeros_like(image_sar, dtype = np.float32))
+        else:
+            image_cloud = self.load_sample_opt(sample['s2cr'])
+            image_sar = self.load_sample_opt(sample['s1'])
         ret = {}
         ret['gt_image'] = image_clear
         #ret['cond_image_sar'] = image_sar

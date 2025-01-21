@@ -81,13 +81,13 @@ class Palette(BaseModel):
         return rgb.type(torch.uint8)
     
     def get_current_visuals(self, phase='train'):
-        self.cond_image.detach()[:, [4]].float().cpu()
         dict = {
             'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:,[0,1,2]].float().cpu()],
             'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,[0,1,2]].float().cpu()],
-
+            'sar_imagevvvh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,5:6].float().cpu()],
             'sar_imagevv' :[self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:4].float().cpu()],
-            'sar_imagevh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,4:5].float().cpu()]
+            'sar_imagevh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,4:5].float().cpu()],
+            'sar_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:6].float().cpu()]
         }
         if self.task in ['inpainting','uncropping']:
             dict.update({
@@ -104,11 +104,11 @@ class Palette(BaseModel):
         ret_path = []
         ret_result = []
         for idx in range(self.batch_size):
-            ret_path.append('GT_{}'.format(self.path[idx]))
-            ret_result.append(self.gt_image[idx].detach().float().cpu())
+            #ret_path.append('GT_{}'.format(self.path[idx]))
+            #ret_result.append(self.gt_image[idx].detach().float().cpu())
 
-            ret_path.append('Cond_{}'.format(self.path[idx]))
-            ret_result.append(self.cond_image[idx].detach().float().cpu())
+            #ret_path.append('Cond_{}'.format(self.path[idx]))
+            #ret_result.append(self.cond_image[idx].detach().float().cpu())
 
             # ret_path.append('Process_{}'.format(self.path[idx]))
             # ret_result.append(self.visuals[idx::self.batch_size].detach().float().cpu())

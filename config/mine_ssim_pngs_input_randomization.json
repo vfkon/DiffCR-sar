@@ -22,7 +22,8 @@
                 ],
                 "args": {
                     "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12OPTCR",
-                    "mode": "train"
+                    "mode": "train",
+                    "rand_use": 0.25
                 }
             },
             "dataloader": {
@@ -36,7 +37,7 @@
                 },
                 "val_args": {
                     "batch_size": 1,
-                    "num_workers": 1,
+                    "num_workers": 4,
                     "shuffle": false,
                     "pin_memory": true,
                     "drop_last": false
@@ -143,8 +144,8 @@
     "train": {
         "n_epoch": 300,
         "n_iter": 100000000,
-        "val_epoch": 20,
-        "save_checkpoint_epoch": 10,
+        "val_epoch": 5,
+        "save_checkpoint_epoch": 5,
         "log_iter": 10000,
         "tensorboard": true
     },
