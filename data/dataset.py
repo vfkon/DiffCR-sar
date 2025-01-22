@@ -414,7 +414,7 @@ class SEN12OPTMS(data.Dataset):
     # train/val split and can be obtained from:
     #   https://github.com/MSchmitt1984/SEN12MS/blob/master/splits
 
-    def __init__(self, path, augmentation = False, mode="train", rand_use = 0.0, use_s2=True, use_s2cr=True, use_s1=True):
+    def __init__(self, path, mode="train", rand_use = 0.0, use_s2=True, use_s2cr=True, use_s1=True):
         """Initialize the dataset"""
 
         # inizialize
@@ -430,7 +430,6 @@ class SEN12OPTMS(data.Dataset):
         assert mode in ["train", "val"]
         self.mode = mode
         self.rand_use = rand_use if mode == "train" else 0.0
-        self.augmentation = augmentation
         # provide number of input channels
         self.n_inputs = get_ninputs_opt(use_s1, use_s2)
 
