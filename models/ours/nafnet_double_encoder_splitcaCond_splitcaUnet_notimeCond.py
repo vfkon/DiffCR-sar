@@ -350,7 +350,7 @@ class UNet(nn.Module):
 
         encs = []
 
-        for encoder, down, cond_encoder, cond_down in zip(self.encoders, self.downs, self.cond_encoders, self.cond_downs):
+        for encoder, down, cond_encoder, cond_down in zip(self.encoders, self.downs, self.cond_encoders, self.cond_downs, self.cond_mix):
             x = encoder(x, t)
             cond = cond_encoder(cond)
             #b, c, h, w = cond.shape

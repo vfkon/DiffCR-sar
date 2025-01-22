@@ -270,16 +270,20 @@ class UNet(nn.Module):
 
         self.intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
-        self.cond_intro = nn.Conv2d(in_channels=img_channel + 3, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+        self.cloud_intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
+        self.sar_intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1,
+                                    groups=1,
+                                    bias=True)
         self.ending = nn.Conv2d(in_channels=width, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
                                 bias=True)
         # self.inp_ending = nn.Conv2d(in_channels=img_channel, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
         #                             bias=True)
 
         self.encoders = nn.ModuleList()
-        self.cond_encoders = nn.ModuleList()
-
+        self.cloud_encoders = nn.ModuleList()
+        self.sar_encoders = nn.ModuleList()
+        self.comb_encoders = nn.ModuleList()
         self.decoders = nn.ModuleList()
 
         self.middle_blks = nn.ModuleList()
@@ -287,7 +291,8 @@ class UNet(nn.Module):
         self.ups = nn.ModuleList()
 
         self.downs = nn.ModuleList()
-        self.cond_downs = nn.ModuleList()
+        self.cloud_downs = nn.ModuleList()
+        self.sar_downs = nn.ModuleList()
 
         chan = width
         for num in enc_blk_nums:
@@ -296,16 +301,27 @@ class UNet(nn.Module):
                     *[NAFBlock(chan) for _ in range(num)]
                 )
             )
-            self.cond_encoders.append(
+            self.cloud_encoders.append(
                 nn.Sequential(
                     *[CondNAFBlock(chan) for _ in range(num)]
                 )
             )
+            self.sar_encoders.append(
+                nn.Sequential(
+                    *[CondNAFBlock(chan) for _ in range(num)]
+                )
+            )
+            self.comb_encoders.append(
+                nn.Conv2d(chan*2, chan, 1, 1)
+            )
             self.downs.append(
                 nn.Conv2d(chan, 2*chan, 2, 2)
             )
-            self.cond_downs.append(
+            self.cloud_downs.append(
                 nn.Conv2d(chan, 2*chan, 2, 2)
+            )
+            self.sar_downs.append(
+                nn.Conv2d(chan, 2 * chan, 2, 2)
             )
             chan = chan * 2
 
@@ -340,25 +356,28 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        cond, x = inp[:,3:],inp[:,:3]  #split input into 4 chunks
-        #cond = torch.stack([x1, x2, x3], dim=1)#stack conditional chunks adding additional dimension
-        #b, n, c, h, w = cond.shape
-        #cond = cond.view(b*n, c, h, w)#reshape
+        cloud, sar, x = inp[:,3:6], inp[:,6:9], inp[:,:3]  #split input into 3 chunks
+
         x = self.intro(x) #1x1 convolution
-        cond = self.cond_intro(cond)#1x1 convolution
+        cloud = self.cond_intro(cloud)#1x1 convolution
+        sar = self.sar_intro(sar)
 
 
         encs = []
 
-        for encoder, down, cond_encoder, cond_down in zip(self.encoders, self.downs, self.cond_encoders, self.cond_downs):
+        for encoder, down, cloud_encoder, sar_encoder, cloud_down, sar_down, cond_comb in zip(self.encoders, self.downs, self.cloud_encoders, self.sar_encoders, self.cloud_downs, self.sar_downs, self.cond_comb):
             x = encoder(x, t)
-            cond = cond_encoder(cond)
+            cloud = cloud_encoder(cloud)
+            sar = sar_encoder(sar)
             #b, c, h, w = cond.shape
             #tmp_cond = cond.view(b//3, 3, c, h, w).sum(dim=1)
+            cond = torch.cat([cloud,sar],dim=1)
+            cond = cond_comb(cond)
             x = x + cond
             encs.append(x)
             x = down(x)
-            cond = cond_down(cond)
+            cloud = cloud_down(cloud)
+            sar = sar_down(sar)
 
         x = self.middle_blks(x, t)
 
