@@ -22,7 +22,7 @@ def ssim_loss(output, target):
         ssim_loss = 1 - ssim((output+1)/2, (target+1)/2, data_range=1, size_average=True)
     return {'total':ssim_loss}
 
-def ssim_mse_loss(output, target, coef = 20):
+def ssim_mse_loss(output, target, coef = 5):
     """
     coef: rate for mse loss
     """
