@@ -6,7 +6,7 @@
     "seed": -1,
     "finetune_norm": false,
     "path": {
-        "base_dir": "experiments",
+        "base_dir": "/media/vkon/hdd-data/diffcr-results",
         "code": "code",
         "tb_logger": "tb_logger",
         "results": "results",
@@ -18,25 +18,26 @@
             "which_dataset": {
                 "name": [
                     "data.dataset",
-                    "SEN12MS"
+                    "SEN12OPTMS"
                 ],
                 "args": {
-                    "data_root": "/home/vkon/datasets/SEN12MS/SEN12MSCR",
-                    "mode": "train"
+                    "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12OPTCR",
+                    "mode": "train",
+                    "rand_use": 0.0
                 }
             },
             "dataloader": {
                 "validation_split": 2,
                 "args": {
-                    "batch_size": 16,
-                    "num_workers": 8,
+                    "batch_size": 12,
+                    "num_workers": 4,
                     "shuffle": true,
-                    "pin_memory": false,
+                    "pin_memory": true,
                     "drop_last": true
                 },
                 "val_args": {
                     "batch_size": 1,
-                    "num_workers": 1,
+                    "num_workers": 4,
                     "shuffle": false,
                     "pin_memory": true,
                     "drop_last": false
@@ -47,10 +48,10 @@
             "which_dataset": {
                 "name": [
                     "data.dataset",
-                    "SEN12MS"
+                    "SEN12OPTMS"
                 ],
                 "args": {
-                    "data_root": "/home/vkon/datasets/SEN12MS/SEN12MSCR",
+                    "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12OPTCR",
                     "mode": "val"
                 }
             }
@@ -91,7 +92,7 @@
                 },
                 "optimizers": [
                     {
-                        "lr": 5e-05,
+                        "lr": 5e-04,
                         "weight_decay": 0
                     }
                 ]
@@ -105,7 +106,7 @@
                 ],
                 "args": {
                     "init_type": "kaiming",
-                    "module_name": "nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond",
+                    "module_name": "mine_3chan_sar_single_enc",
                     "unet": {
                         "img_channel": 3,
                         "width": 64,
@@ -134,21 +135,22 @@
             "mse_loss"
         ],
         "which_metrics": [
-            "mae"
+            "mae",
+            "ssim_metric"
         ]
     },
     "train": {
-        "n_epoch": 3000,
+        "n_epoch": 300,
         "n_iter": 100000000,
-        "val_epoch": 20,
-        "save_checkpoint_epoch": 10,
+        "val_epoch": 5,
+        "save_checkpoint_epoch": 5,
         "log_iter": 10000,
         "tensorboard": true
     },
     "debug": {
         "val_epoch": 1,
         "save_checkpoint_epoch": 1,
-        "log_iter": 10,
+        "log_iter": 1000,
         "debug_split": 50
     }
 }

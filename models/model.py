@@ -126,14 +126,16 @@ class Palette(BaseModel):
     def train_step(self):
         self.netG.train()
         self.train_metrics.reset()
-        for train_data in tqdm.tqdm(self.phase_loader):
+        pbar = tqdm.tqdm(self.phase_loader)
+        for train_data in pbar:
             self.set_input(train_data)
             self.optG.zero_grad()
             loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
             loss['total'].backward()
-            loss.pop('total')
             self.optG.step()
 
+            pbar.set_postfix(**loss)
+            loss.pop('total')
             self.iter += self.batch_size
             self.writer.set_iter(self.epoch, self.iter, phase='train')
             for key, value in loss.items():

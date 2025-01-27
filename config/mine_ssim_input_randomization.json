@@ -92,7 +92,7 @@
                 },
                 "optimizers": [
                     {
-                        "lr": 5e-05,
+                        "lr": 5e-04,
                         "weight_decay": 0
                     }
                 ]

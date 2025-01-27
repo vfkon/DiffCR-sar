@@ -84,7 +84,7 @@ def load_s2(path, use_hr, use_mr, use_lr):
 
 
 # util function for reading s1 data
-def load_s1(path):
+"""def load_s1(path):
     with rasterio.open(path) as data:
         s1 = data.read()
     s1 = s1.astype(np.float32)
@@ -103,8 +103,29 @@ def load_s1(path):
     if std.ndim == 1:
         std = std.view(-1, 1, 1)
     s1.sub_(mean).div_(std)
+    return s1"
+"""
+def load_s1(path):
+    with rasterio.open(path) as data:
+        s1 = data.read()
+    s1 = s1.astype(np.float32)
+    s1 = np.nan_to_num(s1)
+    s1 = np.concatenate([s1,s1[0:1]-s1[1:2]],axis=0)
+    s1 = np.clip(s1, -25, 0)
+    s1 /= 25
+    s1 += 1
+    s1 = s1.astype(np.float32)
+    s1 = torch.tensor(s1, dtype = torch.float32)
+    mean = torch.as_tensor([0.5, 0.5,0.5],
+                           dtype=s1.dtype, device=s1.device)
+    std = torch.as_tensor([0.5, 0.5,0.5],
+                          dtype=s1.dtype, device=s1.device)
+    if mean.ndim == 1:
+        mean = mean.view(-1, 1, 1)
+    if std.ndim == 1:
+        std = std.view(-1, 1, 1)
+    s1.sub_(mean).div_(std)
     return s1
-
 
 # util function for reading lc data
 def load_lc(path, no_savanna=False, igbp=True):
@@ -283,7 +304,7 @@ class SEN12MS(data.Dataset):
     # train/val split and can be obtained from:
     #   https://github.com/MSchmitt1984/SEN12MS/blob/master/splits
 
-    def __init__(self, path, mode="train", no_savanna=False, use_s2hr=True,
+    def __init__(self, path, mode="train", rand_use = 0.0, no_savanna=False, use_s2hr=True,
                  use_s2mr=False, use_s2lr=False, use_s2cr=True, use_s1=True):
         """Initialize the dataset"""
 
@@ -355,8 +376,8 @@ class SEN12MS(data.Dataset):
             # INFO there is one "broken" file in the sen12ms dataset with nan
             #      values in the s1 data. we simply ignore this specific sample
             #      at this point. id: ROIs1868_summer_xx_146_p202
-            if folder == "ROIs1868_summer/s2_146":
-                broken_file = os.path.join(path, "ROIs1868_summer",
+            if folder == "ROIs1868_summer_s2/s2_146":
+                broken_file = os.path.join(path, "ROIs1868_summer_s2",
                                            "s2_146",
                                            "ROIs1868_summer_s2_146_p202.tif")
                 s2_locations.remove(broken_file)
@@ -473,8 +494,8 @@ class SEN12OPTMS(data.Dataset):
             # INFO there is one "broken" file in the sen12ms dataset with nan
             #      values in the s1 data. we simply ignore this specific sample
             #      at this point. id: ROIs1868_summer_xx_146_p202
-            if folder == "ROIs1868_summer/s2_146":
-                broken_file = os.path.join(path, "ROIs1868_summer",
+            if folder == 'ROIs1868_summer_s2/s2_146':
+                broken_file = os.path.join(path, "ROIs1868_summer_s2",
                                            "s2_146",
                                            "ROIs1868_summer_s2_146_p202.png")
                 s2_locations.remove(broken_file)

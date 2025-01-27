@@ -132,9 +132,7 @@
             }
         ],
         "which_losses": [
-            "ssim_mse_loss",
-            "mse_loss",
-            "ssim_loss"
+            "mse_loss"
         ],
         "which_metrics": [
             "mae",

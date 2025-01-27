@@ -312,7 +312,7 @@ class UNet(nn.Module):
                 )
             )
             self.comb_encoders.append(
-                nn.Conv2d(chan*2, chan, 1, 1)
+                nn.Conv2d(chan*2, chan, 3, 1)
             )
             self.downs.append(
                 nn.Conv2d(chan, 2*chan, 2, 2)
@@ -356,7 +356,7 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        cloud, sar, x = inp[:,3:6], inp[:,6:9], inp[:,:3]  #split input into 3 chunks
+        cloud, sar, x = inp[:,0:3], inp[:,3:6], inp[:,6:9]  #split input into 3 chunks
 
         x = self.intro(x) #1x1 convolution
         cloud = self.cond_intro(cloud)#1x1 convolution

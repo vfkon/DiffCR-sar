@@ -340,7 +340,7 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        cond, x = inp[:,3:],inp[:,:3]  #split input into 4 chunks
+        cond, x = inp[:,:6],inp[:,6:]  #split input into 4 chunks
         #cond = torch.stack([x1, x2, x3], dim=1)#stack conditional chunks adding additional dimension
         #b, n, c, h, w = cond.shape
         #cond = cond.view(b*n, c, h, w)#reshape

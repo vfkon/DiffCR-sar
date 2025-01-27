@@ -55,6 +55,8 @@ class Network(BaseNetwork):
             from .ours.nafnet_double_encoder_splitcaCond_splitcaUnet_notimeCond import UNet
         elif module_name == 'mine_3chan_sar_single_enc':
             from .ours.mine_3chan_sar_single_enc import UNet
+        elif module_name == 'mine_3chan_sar_two_enc':
+            from .ours.mine_3chan_sar_single_enc import UNet
         self.denoise_fn = UNet(**unet)
         self.beta_schedule = beta_schedule
 
