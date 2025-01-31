@@ -340,10 +340,10 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        cond, x = inp[:,:6],inp[:,6:]  #split input into 4 chunks
-        #cond = torch.stack([x1, x2, x3], dim=1)#stack conditional chunks adding additional dimension
-        #b, n, c, h, w = cond.shape
-        #cond = cond.view(b*n, c, h, w)#reshape
+        cloud, sar, x = inp.chunk(3, dim=1)  #split input into 3 chunks
+        cond = torch.stack([cloud, sar], dim=1)#stack conditional chunks adding additional dimension
+        b, n, c, h, w = cond.shape
+        cond = cond.view(b, c*n, h, w)#reshape
         x = self.intro(x) #1x1 convolution
         cond = self.cond_intro(cond)#1x1 convolution
 
@@ -354,7 +354,7 @@ class UNet(nn.Module):
             x = encoder(x, t)
             cond = cond_encoder(cond)
             #b, c, h, w = cond.shape
-            #tmp_cond = cond.view(b//3, 3, c, h, w).sum(dim=1)
+            #tmp_cond = cond.view(b, n, c//n, h, w).sum(dim=1)
             x = x + cond
             encs.append(x)
             x = down(x)

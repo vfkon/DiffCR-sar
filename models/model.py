@@ -3,6 +3,7 @@ import tqdm
 from core.base_model import BaseModel
 from core.logger import LogTracker
 import copy
+from torch.cuda.amp import GradScaler, autocast
 class EMA():
     def __init__(self, beta=0.9999):
         super().__init__()
@@ -24,6 +25,7 @@ class Palette(BaseModel):
         ''' networks, dataloder, optimizers, losses, etc. '''
         self.loss_fn = losses[0]
         self.netG = networks[0]
+        self.scaler = GradScaler(enabled=self.opt['autocast'])
         if ema_scheduler is not None:
             self.ema_scheduler = ema_scheduler
             self.netG_EMA = copy.deepcopy(self.netG)
@@ -68,8 +70,8 @@ class Palette(BaseModel):
     def get_rgb_tensor(self, rgb):
         rgb = rgb*0.5+0.5
         rgb = rgb - torch.min(rgb)
-        print(rgb.min())
-        print(rgb.max())
+        #print(rgb.min())
+        #print(rgb.max())
 
         # treat saturated images, scale values
         if torch.max(rgb) == 0:
@@ -130,9 +132,11 @@ class Palette(BaseModel):
         for train_data in pbar:
             self.set_input(train_data)
             self.optG.zero_grad()
-            loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
-            loss['total'].backward()
-            self.optG.step()
+            with autocast(enabled=self.opt['autocast'], dtype=torch.float16):
+                loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
+            self.scaler.scale(loss['total']).backward()
+            self.scaler.step(self.optG)
+            self.scaler.update()
 
             pbar.set_postfix(**loss)
             loss.pop('total')

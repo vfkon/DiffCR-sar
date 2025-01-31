@@ -16,7 +16,6 @@ multi_df_mean_s2 = []
 multi_df_mean_s2_clipped = []
 multi_df_std_s2 = []
 multi_df_std_s2_clipped = []
-print('1')
 s1_df = pd.DataFrame()
 for dirpath, _, file_list in os.walk(path):
     pbar = tqdm.tqdm(file_list)

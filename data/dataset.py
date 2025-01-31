@@ -448,7 +448,7 @@ class SEN12OPTMS(data.Dataset):
         self.use_s2 = use_s2
         self.use_s2cr = use_s2cr
         self.use_s1 = use_s1
-        assert mode in ["train", "val"]
+        assert mode in ["train", "val", "test"]
         self.mode = mode
         self.rand_use = rand_use if mode == "train" else 0.0
         # provide number of input channels
@@ -485,6 +485,8 @@ class SEN12OPTMS(data.Dataset):
             train_list = [x for x in train_list if x not in val_list]
             sample_dirs = train_list
         elif mode == "val":
+            sample_dirs = val_list[:500]
+        elif mode == 'test':
             sample_dirs = val_list
 
         for folder in sample_dirs:
@@ -516,7 +518,8 @@ class SEN12OPTMS(data.Dataset):
 
         # sort list of samples
         self.samples = sorted(self.samples, key=lambda i: i['id'])
-
+        if mode=='val':
+            self.samples = self.samples[:500]
         print("loaded", len(self.samples),
               "samples from the sen12ms subset", mode)
         self.augment_rotation_param = np.random.randint(
@@ -530,7 +533,8 @@ class SEN12OPTMS(data.Dataset):
 
     def __getitem__(self, index):
         """Get a single example from the dataset"""
-
+        if self.index >= len(self.samples):
+            self.index = 0
         # get and load sample from index file
         sample = self.samples[index]
         image_clear = self.load_sample_opt(sample['s2'])
@@ -549,21 +553,19 @@ class SEN12OPTMS(data.Dataset):
         #ret['cond_image_sar'] = image_sar
         ret['cond_image'] = torch.cat([image_cloud, image_sar], dim = 0)
         ret['path'] = sample['id']
+        self.index += 1
         return ret
 
     def load_sample_opt(self, path):
 
         img = np.array(Image.open(path)).transpose((2,0,1))
         if self.mode == 'train':
-            if not self.augment_flip_param[self.index // 4] == 0:
-                img = np.flip(img, self.augment_flip_param[self.index // 4])
-            if not self.augment_rotation_param[self.index // 4] == 0:
+            if not self.augment_flip_param[self.index] == 0:
+                img = np.flip(img, self.augment_flip_param[self.index])
+            if not self.augment_rotation_param[self.index] == 0:
                 img = np.rot90(
-                    img, self.augment_rotation_param[self.index // 4], (1, 2))
-            self.index += 1
+                    img, self.augment_rotation_param[self.index], (1, 2))
 
-        if self.index // 4 >= len(self.samples):
-            self.index = 0
 
         image = torch.tensor(img.copy())
         image = image / 255.0

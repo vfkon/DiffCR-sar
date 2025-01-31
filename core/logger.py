@@ -162,7 +162,8 @@ class LogTracker:
     def update(self, key, value, n=1):
         self._data.total[key] += value * n
         self._data.counts[key] += n
-        self._data.average[key] = self._data.total[key] / self._data.counts[key]
+        value = self._data.total[key] / self._data.counts[key]
+        self._data.average[key] = value
 
     def avg(self, key):
         return self._data.average[key]

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pandas.core.nanops import nanany
 from torch.autograd import Variable
 from pytorch_msssim import ssim
 # class mse_loss(nn.Module):
@@ -12,22 +13,66 @@ from pytorch_msssim import ssim
 
 
 def mse_loss(output, target):
-    return {'total':F.mse_loss(output, target)}
+    tmp_output = (output * 0.5) + 0.5
+    tmp_target = (target * 0.5) + 0.5
+    #tmp_output = torch.clip(tmp_output, 0, 1)
+    #tmp_target = torch.clip(tmp_target, 0, 1)
+    return {'total':F.mse_loss(tmp_output, tmp_target)}
 
 def l1_loss(output, target):
     return {'total':F.l1_loss(output, target)}
 
+def histogram_loss(output, target, mode='hist', coef = 4, bins = 100):
+    if mode=='simple':
+        mean_out = torch.mean(output.reshape(24,-1), dim=1)
+        std_out = torch.std(output.reshape(24,-1), dim=1)
+        mean_target = torch.mean(target.reshape(24,-1), dim=-1)
+        std_target = torch.std(target.reshape(24,-1), dim=1)
+        return (((mean_out - mean_target)**2)/(coef*(std_out**2 + std_target**2))).mean()
+        #return (F.l1_loss(mean_out, mean_target)['total'] + F.l1_loss(std_out, std_target)['total'])*coef
+    elif mode=='hist':
+        hist_out = torch.histogram(output, bins=torch.linspace(0,1,bins))
+        hist_target = torch.histogram(target, bins=torch.linspace(0,1,bins))
+        return F.l1_loss(hist_out[0], hist_target[0])['total']*coef
+
 def ssim_loss(output, target):
-    ssim_loss = 1 - ssim((output+1)/2, (target+1)/2, data_range=1, size_average=True)
+    """    tmp_output = (output * 0.5) + 0.5
+    tmp_target = (target * 0.5) + 0.5
+    tmp_output = torch.clip(tmp_output,0,1)
+    tmp_target = torch.clip(tmp_target,0,1)"""
+
+    ssim_loss = 1 - ssim(output, target, data_range = 1.0, size_average=True)
     return {'total':ssim_loss}
 
-def ssim_mse_loss(output, target, coef = 5):
+def ssim_mse_loss(output, target, coef = 4):
     """
     coef: rate for mse loss
     """
-    mseloss = mse_loss(output, target)['total']
-    ssimloss = ssim_loss(output,target)['total']* coef
+    tmp_output = (output * 0.5) + 0.5
+    tmp_target = (target * 0.5) + 0.5
+    tmp_output = torch.clip(tmp_output, 0, 1)
+    tmp_target = torch.clip(tmp_target, 0, 1)
+    mseloss = mse_loss(tmp_output, tmp_target)['total']
+    ssimloss = ssim_loss(tmp_output,tmp_target)['total']* coef
     return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'total': mseloss+ssimloss, 'ssim_mse_loss': mseloss+ssimloss }
+
+def ssim_mse_hist_loss(output, target, coef = 4):
+    """
+    coef: rate for mse loss
+    """
+    tmp_output = (output * 0.5) + 0.5
+    tmp_target = (target * 0.5) + 0.5
+    tmp_output = torch.clip(tmp_output, 0, 1)
+    tmp_target = torch.clip(tmp_target, 0, 1)
+    hist_loss = histogram_loss(tmp_output, tmp_target , mode='simple')
+    mseloss = mse_loss(tmp_output, tmp_target)['total']
+    ssimloss = ssim_loss(tmp_output,tmp_target)['total']* coef
+    if torch.isnan(mseloss+ssimloss+ hist_loss):
+        exit(-1)
+    return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'histogram_loss': hist_loss,
+            'total': mseloss+ssimloss+ hist_loss, 'ssim_mse_hist_loss': mseloss+ssimloss + hist_loss }
+
+
 
 class FocalLoss(nn.Module):
     def __init__(self, gamma=2, alpha=None, size_average=True):
