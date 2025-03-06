@@ -5,7 +5,8 @@ from models.metric import inception_score
 import numpy as np
 import glob
 import os
-from skimage.measure import compare_psnr, compare_ssim
+from skimage.metrics import peak_signal_noise_ratio as compare_psnr
+from skimage.metrics import structural_similarity as compare_ssim
 from PIL import Image
 from rich.progress import track
 
@@ -21,31 +22,33 @@ if __name__ == '__main__':
     args = parser.parse_args()
     psnr = []
     ssim = []
-    for gt_path, out_path in track(zip(glob.glob(os.path.join(args.src, "*")), glob.glob(os.path.join(args.dst, "*"))), total=685):
-        gt = np.array(Image.open(gt_path))
-        out = np.array(Image.open(out_path))
-        _psnr = compare_psnr(gt, out)
-        _ssim = ssim = compare_ssim(
-            gt, out, multichannel=True, gaussian_weights=True, use_sample_covariance=False, sigma=1.5)
-        psnr += [_psnr]
-        ssim += [_ssim]
-    psnr = sum(psnr)/len(psnr)
-    ssim = sum(ssim)/len(ssim)
-    print(
-        f'PSNR: {psnr}\n',
-        f'SSIM: {ssim}\n',
-    )
+    gt_paths = glob.glob(os.path.join(args.src, "GT_*.tif"))
+    out_paths = [x.replace('GT', 'Out') for x in gt_paths]
+  #  for gt_path, out_path in track(zip(gt_paths, out_paths), total=12666):
+   #     gt = np.array(Image.open(gt_path))
+  #      out = np.array(Image.open(out_path))
+  #      _psnr = compare_psnr(gt, out, data_range = 255)
+  #      _ssim = compare_ssim(
+  #          gt, out, data_range=255, channel_axis=2)
+  #      psnr += [_psnr]
+  #      ssim += [_ssim]
+  #  psnr = sum(psnr)/len(psnr)
+  #  ssim = sum(ssim)/len(ssim)
+ #   print(
+ #       f'PSNR: {psnr}\n',
+ #       f'SSIM: {ssim}\n',
+ #   )
     fid_score = fid.compute_fid(args.src, args.dst)
-    is_mean, is_std = inception_score(
-        BaseDataset(args.dst),
-        cuda=True,
-        batch_size=8,
-        resize=True,
-        splits=10,
-    )
+  #  is_mean, is_std = inception_score(
+  #      BaseDataset(args.dst),
+  #      cuda=True,
+  #      batch_size=8,
+  #      resize=True,
+#        splits=10,
+#    )
     print(
         f'FID: {fid_score}\n',
-        f'IS: {is_mean} {is_std}\n',
+       # f'IS: {is_mean} {is_std}\n',
     )
 
 """

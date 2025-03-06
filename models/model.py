@@ -86,10 +86,10 @@ class Palette(BaseModel):
         dict = {
             'gt_image': [self.get_rgb_tensor(i) for i in self.gt_image.detach()[:,[0,1,2]].float().cpu()],
             'cond_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,[0,1,2]].float().cpu()],
-            'sar_imagevvvh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,5:6].float().cpu()],
+            #'sar_imagevvvh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,5:6].float().cpu()],
             'sar_imagevv' :[self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:4].float().cpu()],
-            'sar_imagevh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,4:5].float().cpu()],
-            'sar_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:6].float().cpu()]
+            #'sar_imagevh' : [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,4:5].float().cpu()],
+            #'sar_image': [self.get_rgb_tensor(i) for i in self.cond_image.detach()[:,3:6].float().cpu()]
         }
         if self.task in ['inpainting','uncropping']:
             dict.update({
@@ -106,8 +106,17 @@ class Palette(BaseModel):
         ret_path = []
         ret_result = []
         for idx in range(self.batch_size):
-            #ret_path.append('GT_{}'.format(self.path[idx]))
-            #ret_result.append(self.gt_image[idx].detach().float().cpu())
+            ret_path.append('GT_{}'.format(self.path[idx]))
+            ret_result.append(self.gt_image[idx].detach().float().cpu())
+
+            ret_path.append('Cond_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx,:3].detach().float().cpu())
+
+            ret_path.append('SAR1_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx, 3].detach().float().cpu())
+
+            ret_path.append('SAR2_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx, 4].detach().float().cpu())
 
             #ret_path.append('Cond_{}'.format(self.path[idx]))
             #ret_result.append(self.cond_image[idx].detach().float().cpu())
@@ -132,7 +141,7 @@ class Palette(BaseModel):
         for train_data in pbar:
             self.set_input(train_data)
             self.optG.zero_grad()
-            with autocast(enabled=self.opt['autocast'], dtype=torch.float16):
+            with autocast(enabled=self.opt['autocast'], dtype=torch.bfloat16):
                 loss = self.netG(self.gt_image, self.cond_image, mask=self.mask)
             self.scaler.scale(loss['total']).backward()
             self.scaler.step(self.optG)

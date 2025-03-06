@@ -12,15 +12,23 @@ from pytorch_msssim import ssim
 #         return self.loss_fn(output, target)
 
 
-def mse_loss(output, target):
-    tmp_output = (output * 0.5) + 0.5
-    tmp_target = (target * 0.5) + 0.5
+def mse_loss(output, target, mask=None):
+    #tmp_output = (output * 0.5) + 0.5
+    #tmp_target = (target * 0.5) + 0.5
     #tmp_output = torch.clip(tmp_output, 0, 1)
     #tmp_target = torch.clip(tmp_target, 0, 1)
-    return {'total':F.mse_loss(tmp_output, tmp_target)}
+    #tmp_target = F.softmax(target)
+    #tmp_output = F.softmax(output)
+    mse_loss = F.mse_loss(output, target)
+    if mask != None:
+        mse_loss = torch.where(mask==1,mse_loss*2, mse_loss)
+    return {'total': mse_loss, 'mse_loss':mse_loss}
 
-def l1_loss(output, target):
-    return {'total':F.l1_loss(output, target)}
+def l1_loss(output, target, mask):
+    l1_loss = F.l1_loss(output, target)
+    if mask != None:
+        l1_loss = torch.where(mask==1,l1_loss*2, l1_loss)
+    return {'total': l1_loss}
 
 def histogram_loss(output, target, mode='hist', coef = 4, bins = 100):
     if mode=='simple':
@@ -35,25 +43,29 @@ def histogram_loss(output, target, mode='hist', coef = 4, bins = 100):
         hist_target = torch.histogram(target, bins=torch.linspace(0,1,bins))
         return F.l1_loss(hist_out[0], hist_target[0])['total']*coef
 
-def ssim_loss(output, target):
-    """    tmp_output = (output * 0.5) + 0.5
+def ssim_loss(output, target, mask=None):
+    tmp_output = (output * 0.5) + 0.5
     tmp_target = (target * 0.5) + 0.5
     tmp_output = torch.clip(tmp_output,0,1)
-    tmp_target = torch.clip(tmp_target,0,1)"""
+    tmp_target = torch.clip(tmp_target,0,1)
 
-    ssim_loss = 1 - ssim(output, target, data_range = 1.0, size_average=True)
+    ssim_loss = 1 - ssim(tmp_output, tmp_target, data_range = 1.0)
+    if mask != None:
+        ssim_loss = torch.where(mask==1,ssim_loss*2, ssim_loss)
     return {'total':ssim_loss}
 
-def ssim_mse_loss(output, target, coef = 4):
+def ssim_mse_loss(output, target, mask = None, coef = 1):
     """
     coef: rate for mse loss
     """
-    tmp_output = (output * 0.5) + 0.5
-    tmp_target = (target * 0.5) + 0.5
-    tmp_output = torch.clip(tmp_output, 0, 1)
-    tmp_target = torch.clip(tmp_target, 0, 1)
-    mseloss = mse_loss(tmp_output, tmp_target)['total']
-    ssimloss = ssim_loss(tmp_output,tmp_target)['total']* coef
+    #tmp_output = (output * 0.5) + 0.5
+    #tmp_target = (target * 0.5) + 0.5
+    #tmp_output = torch.clip(tmp_output, 0, 1)
+    #tmp_target = F.softmax(target)
+    #tmp_output = F.softmax(output)
+
+    mseloss = mse_loss(output, target, mask)['total']
+    ssimloss = ssim_loss(output,target, mask)['total']* coef
     return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'total': mseloss+ssimloss, 'ssim_mse_loss': mseloss+ssimloss }
 
 def ssim_mse_hist_loss(output, target, coef = 4):

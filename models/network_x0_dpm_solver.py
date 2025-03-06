@@ -56,7 +56,13 @@ class Network(BaseNetwork):
         elif module_name == 'mine_3chan_sar_single_enc':
             from .ours.mine_3chan_sar_single_enc import UNet
         elif module_name == 'mine_3chan_sar_two_enc':
-            from .ours.mine_3chan_sar_single_enc import UNet
+            from .ours.mine_3chan_sar_two_enc import UNet
+        elif module_name == 'mine_synthetic':
+            from .ours.mine_synthetic import UNet
+        elif module_name == 'mine_synthetic_sar':
+            from .ours.mine_synthetic_sar import UNet
+        elif module_name == 'mine_synthetic_sar_new':
+            from .ours.mine_synthetic_sar_new import UNet
         self.denoise_fn = UNet(**unet)
         self.beta_schedule = beta_schedule
 

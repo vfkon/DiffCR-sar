@@ -272,7 +272,7 @@ class UNet(nn.Module):
                                bias=True)
         self.cloud_intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
-        self.sar_intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1,
+        self.sar_intro = nn.Conv2d(in_channels=2, out_channels=width, kernel_size=3, padding=1, stride=1,
                                     groups=1,
                                     bias=True)
         self.ending = nn.Conv2d(in_channels=width, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
@@ -356,23 +356,23 @@ class UNet(nn.Module):
         t = self.map(self.emb(gammas.view(-1, ))) #time embedding with sinusoidal embedding and a simple MLP
         inp = self.check_image_size(inp)
 
-        cloud, sar, x = inp[:,0:3], inp[:,3:6], inp[:,6:9]  #split input into 3 chunks
+        cloud, sar, x = inp[:,0:3], inp[:,3:5], inp[:,5:]  #split input into 3 chunks
 
         x = self.intro(x) #1x1 convolution
-        cloud = self.cond_intro(cloud)#1x1 convolution
+        cloud = self.cloud_intro(cloud)#1x1 convolution
         sar = self.sar_intro(sar)
 
 
         encs = []
 
-        for encoder, down, cloud_encoder, sar_encoder, cloud_down, sar_down, cond_comb in zip(self.encoders, self.downs, self.cloud_encoders, self.sar_encoders, self.cloud_downs, self.sar_downs, self.cond_comb):
+        for encoder, down, cloud_encoder, sar_encoder, cloud_down, sar_down, cond_comb in zip(self.encoders, self.downs, self.cloud_encoders, self.sar_encoders, self.cloud_downs, self.sar_downs, self.comb_encoders):
             x = encoder(x, t)
             cloud = cloud_encoder(cloud)
             sar = sar_encoder(sar)
             #b, c, h, w = cond.shape
             #tmp_cond = cond.view(b//3, 3, c, h, w).sum(dim=1)
-            cond = torch.cat([cloud,sar],dim=1)
-            cond = cond_comb(cond)
+            cond = cloud * sar
+            #cond = cond_comb(cond)
             x = x + cond
             encs.append(x)
             x = down(x)
