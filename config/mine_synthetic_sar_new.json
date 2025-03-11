@@ -7,7 +7,7 @@
     "seed": 42,
     "finetune_norm": false,
     "path": {
-        "base_dir": "/media/vkon/hdd-data/diffcr-results",
+        "base_dir": "/home/vkon/hdd/diffcr-results",
         "code": "code",
         "tb_logger": "tb_logger",
         "results": "results",
@@ -22,7 +22,7 @@
                     "SyntheticSARSEN12MS"
                 ],
                 "args": {
-                    "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
+                    "data_root": "/home/vkon/ssd/datasets/SEN12MSCR/SEN12MSCR",
                     "mode": "train",
                     "rand_use": 0.0
                 }
@@ -30,8 +30,8 @@
             "dataloader": {
                 "validation_split": 2,
                 "args": {
-                    "batch_size": 12,
-                    "num_workers": 4,
+                    "batch_size": 80,
+                    "num_workers": 32,
                     "shuffle": true,
                     "pin_memory": true,
                     "drop_last": true
@@ -52,7 +52,7 @@
                     "SyntheticSARSEN12MS"
                 ],
                 "args": {
-                    "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
+                    "data_root": "/home/vkon/ssd/datasets/SEN12MSCR/SEN12MSCR",
                     "mode": "val"
                 }
             }

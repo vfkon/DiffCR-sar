@@ -9,6 +9,9 @@ import core.praser as Praser
 import core.util as Util
 from data import define_dataloader
 from models import create_model, define_network, define_loss, define_metric
+
+
+
 def main_worker(gpu, ngpus_per_node, opt):
     """  threads running on each GPU """
     if 'local_rank' not in opt:
@@ -24,6 +27,8 @@ def main_worker(gpu, ngpus_per_node, opt):
         )
     '''set seed and and cuDNN environment '''
     torch.backends.cudnn.enabled = True
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cuda.matmul.allow_tf32 = True
     # warnings.warn('You have chosen to use cudnn for accleration. torch.backends.cudnn.enabled=True')
     Util.set_seed(opt['seed'])
 

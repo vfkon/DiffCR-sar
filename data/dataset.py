@@ -62,7 +62,7 @@ def augment_clear_image(image, percent=30, clear_image_percent=0.2):
     _, img_height, img_width = image.shape
     total_pixels = img_height * img_width
     cloud_count = np.random.randint(low=0, high=3)
-    coverage_percent = np.random.randint(0.25 * percent, percent)
+    coverage_percent = np.random.randint(0.4 * percent, percent)
     target_coverage_pixels = int(total_pixels * (coverage_percent / 100))
     for i in range(cloud_count - 1):
         cloud_pix_count = random.randint(10, int(target_coverage_pixels * 0.5))
