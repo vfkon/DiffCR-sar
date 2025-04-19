@@ -335,8 +335,7 @@ class UNet(nn.Module):
 
         self.ending = nn.Conv2d(in_channels=width*2, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
                                 bias=True)
-        # self.inp_ending = nn.Conv2d(in_channels=img_channel, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
-        #                             bias=True)
+        self.residual_ending = CBAM_mod(img_channel + 2, width)
 
         self.encoders = nn.ModuleList()
         self.cond_encoders = nn.ModuleList()
@@ -408,7 +407,7 @@ class UNet(nn.Module):
         #cond = cond.view(b, c*n, h, w)#reshape
         x = self.intro(x) #1x1 convolution
         cond = self.cond_intro(cond)#1x1 convolution
-        cond_start = cond.clone()
+
 
         encs = []
 
@@ -429,10 +428,10 @@ class UNet(nn.Module):
             x = x + enc_skip
             x = decoder(x, t)
 
-        x = self.cat
-        x = torch.cat([cond_start, x], dim=1)
+        res_end = self.residual_ending(inp[:,:5])
+        x = torch.cat([res_end, x], dim=1)
         x = self.ending(x)
-        # x = x + self.inp_ending(inp)
+
     
 
         return x

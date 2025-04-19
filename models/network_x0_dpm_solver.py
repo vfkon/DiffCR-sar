@@ -63,6 +63,16 @@ class Network(BaseNetwork):
             from .ours.mine_synthetic_sar import UNet
         elif module_name == 'mine_synthetic_sar_new':
             from .ours.mine_synthetic_sar_new import UNet
+        elif module_name == 'mine_synthetic_sar_residual':
+            from .ours.mine_synthetic_sar_residual import UNet
+        elif module_name == 'mine_unconditional':
+            from .ours.mine_unconditional import UNet
+        elif module_name == 'mine_synthetic_sar_masked_noise':
+            from .ours.mine_synthetic_sar_masked_noise import UNet
+        elif module_name == 'mine_synthetic_sar_new_masked':
+            from .ours.mine_synthetic_sar_new_masked import UNet
+        elif module_name == 'mine_synthetic_sarmask_input':
+            from .ours.mine_synthetic_sarmask_input import UNet
         self.denoise_fn = UNet(**unet)
         self.beta_schedule = beta_schedule
 
@@ -194,7 +204,7 @@ class Network(BaseNetwork):
 
         if mask is not None:
             noise_hat = self.denoise_fn(torch.cat([y_cond, y_noisy*mask+(1.-mask)*y_0], dim=1), sample_gammas)
-            losses = self.loss_fn(mask*noise, mask*noise_hat)
+            losses = self.loss_fn(y_0, noise_hat)
         else:
             y_0_hat = self.denoise_fn(torch.cat([y_cond, y_noisy], dim=1), sample_gammas)
             losses = self.loss_fn(y_0, y_0_hat)

@@ -98,6 +98,64 @@ class SimpleGate(nn.Module):
         x1, x2 = x.chunk(2, dim=1)
         return x1 * x2
 
+class ChannelAttention(nn.Module):
+    def __init__(self, channels, reduction):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(channels,channels//reduction),
+            nn.ReLU(),
+            nn.Linear(channels//reduction, channels)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.maxpool = nn.AdaptiveMaxPool2d(1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x_avg = self.avgpool(x)
+        x_max = self.maxpool(x)
+        b, c , _, _ = x_avg.size()
+        x_avg = self.mlp(x_avg.view(b,c)).view(b, c, 1, 1)
+        x_max = self.mlp(x_max.view(b,c)).view(b,c,1,1)
+        x_out = self.sigmoid(x_max+x_avg) * x
+        return x_out
+
+class SpatialAttention(nn.Module):
+    def __init__(self, bias = False, window = 7):
+        super().__init__()
+        self.bias = bias
+        self.conv = nn.Conv2d(in_channels=2, out_channels=1,kernel_size=window, stride=1, padding='same', dilation=1, bias = self.bias)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x_avg = torch.mean(x,1, keepdim=True)
+        x_max = torch.max(x,1, keepdim=True)[0]
+        x_cat = torch.cat((x_max,x_avg), dim=1)
+        x_conv = self.conv(x_cat)
+        output = self.sigmoid(x_conv) * x
+        return output
+
+class CBAM_mod(nn.Module):
+    def __init__(self, channels, out_channels, reduction=4, bias = False, window = 7):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels=10, out_channels=out_channels,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.channel_attention1 = ChannelAttention(out_channels, reduction)
+        self.spatial_attention1 = SpatialAttention(bias, window)
+        self.spatial_attention2 = SpatialAttention(bias, window)
+        self.spatial_attention3 = SpatialAttention(bias, window)
+
+    def forward(self, x):
+        img, sar = x[:,:3], x[:,3:]
+        output_img = self.spatial_attention1(img)
+        output_sar = self.spatial_attention2(sar)
+        output_map = torch.cat([output_img, output_sar, x], 1)
+        output = self.conv1(output_map)
+        output = self.channel_attention1(output)
+        output = self.spatial_attention3(output)
+        return output
+
+
+
 class CondNAFBlock(nn.Module):
     def __init__(self, c, DW_Expand=2, FFN_Expand=2, drop_out_rate=0.):
         super().__init__()
@@ -150,16 +208,16 @@ class CondNAFBlock(nn.Module):
     def forward(self, inp):
         x = inp
 
-        x = self.norm1(x)
+        x = self.norm1(x)#LN
 
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.sg(x)
+        x = self.conv1(x)#conv1x1
+        x = self.conv2(x)#DConv3x3
+        x = self.sg(x)#SSA
         x_avg, x_max = x.chunk(2, dim=1)
         x_avg = self.sca_avg(x_avg)*x_avg
         x_max = self.sca_max(x_max)*x_max
         x = torch.cat([x_avg, x_max], dim=1)
-        x = self.conv3(x)
+        x = self.conv3(x)#
 
         x = self.dropout1(x)
 
@@ -172,6 +230,7 @@ class CondNAFBlock(nn.Module):
         x = self.dropout2(x)
 
         return y + x * self.gamma
+
 
 class NAFBlock(EmbedBlock):
     def __init__(self, c, DW_Expand=2, FFN_Expand=2, drop_out_rate=0.):
@@ -229,7 +288,7 @@ class NAFBlock(EmbedBlock):
     def forward(self, inp, t):
         x = inp
 
-        x = self.norm1(x)
+        x = self.norm1(x)#LN
 
         x = self.conv1(x)
         x = self.conv2(x)
@@ -270,12 +329,13 @@ class UNet(nn.Module):
 
         self.intro = nn.Conv2d(in_channels=img_channel, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
-        self.cond_intro = nn.Conv2d(in_channels=img_channel + 2, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+        #self.cond_intro = nn.Conv2d(in_channels=img_channel + 2, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
+        #                       bias=True)
+        self.cond_intro = nn.Conv2d(in_channels=2, out_channels=width, kernel_size=3, padding=1, stride=1, groups=1,
                                bias=True)
+
         self.ending = nn.Conv2d(in_channels=width, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
                                 bias=True)
-        # self.inp_ending = nn.Conv2d(in_channels=img_channel, out_channels=3, kernel_size=3, padding=1, stride=1, groups=1,
-        #                             bias=True)
 
         self.encoders = nn.ModuleList()
         self.cond_encoders = nn.ModuleList()
@@ -341,7 +401,7 @@ class UNet(nn.Module):
         inp = self.check_image_size(inp)
 
         #cloud, sar, x = inp.chunk(3, dim=1)  #split input into 3 chunks
-        cond, x = inp[:,:5], inp[:,5:]
+        cond, x = inp[:,:2], inp[:,2:]
         #cond = torch.stack([cloud, sar], dim=1)#stack conditional chunks adding additional dimension
         #b, n, c, h, w = cond.shape
         #cond = cond.view(b, c*n, h, w)#reshape
@@ -356,7 +416,6 @@ class UNet(nn.Module):
             cond = cond_encoder(cond)
             #b, c, h, w = cond.shape
             #tmp_cond = cond.view(b, n, c//n, h, w).sum(dim=1)
-
             x = x + cond
             encs.append(x)
             x = down(x)
@@ -369,10 +428,8 @@ class UNet(nn.Module):
             x = x + enc_skip
             x = decoder(x, t)
 
-        x = self.ending(x)
-        # x = x + self.inp_ending(inp)
-    
 
+        x = self.ending(x)
         return x
 
     def check_image_size(self, x):

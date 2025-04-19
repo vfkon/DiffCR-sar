@@ -47,7 +47,11 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)): # 可视化v2.0
             math.sqrt(n_img)), normalize=False).numpy()
         img_np = np.transpose(img_np, (1, 2, 0))  # HWC, RGB
     elif n_dim == 3:
-        img_np = get_rgb(tensor)
+        if tensor.shape[0]==2:
+            tensor = tensor[0]
+            img_np = tensor.numpy()
+        else:
+            img_np = get_rgb(tensor)
     elif n_dim == 2:
         img_np = tensor.numpy()
     else:

@@ -10,13 +10,56 @@ from .nn import (
     zero_module,
     normalization,
     count_flops_attn,
-    gamma_embedding
+    gamma_embedding,
 )
 
 class SiLU(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
 
+class LayerNormFunction(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, x, weight, bias, eps):
+        ctx.eps = eps
+        N, C, H, W = x.size()
+        mu = x.mean(1, keepdim=True)
+        var = (x - mu).pow(2).mean(1, keepdim=True)
+        y = (x - mu) / (var + eps).sqrt()
+        ctx.save_for_backward(y, var, weight)
+        y = weight.view(1, C, 1, 1) * y + bias.view(1, C, 1, 1)
+        return y
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        eps = ctx.eps
+
+        N, C, H, W = grad_output.size()
+        y, var, weight = ctx.saved_variables
+        g = grad_output * weight.view(1, C, 1, 1)
+        mean_g = g.mean(dim=1, keepdim=True)
+
+        mean_gy = (g * y).mean(dim=1, keepdim=True)
+        gx = 1. / torch.sqrt(var + eps) * (g - y * mean_gy - mean_g)
+        return gx, (grad_output * y).sum(dim=3).sum(dim=2).sum(dim=0), grad_output.sum(dim=3).sum(dim=2).sum(
+            dim=0), None
+
+class LayerNorm2d(nn.Module):
+
+    def __init__(self, channels, eps=1e-6):
+        super(LayerNorm2d, self).__init__()
+        self.register_parameter('weight', nn.Parameter(torch.ones(channels)))
+        self.register_parameter('bias', nn.Parameter(torch.zeros(channels)))
+        self.eps = eps
+
+    def forward(self, x):
+        return LayerNormFunction.apply(x, self.weight, self.bias, self.eps)
+
+
+class SimpleGate(nn.Module):
+    def forward(self, x):
+        x1, x2 = x.chunk(2, dim=1)
+        return x1 * x2
 class EmbedBlock(nn.Module):
     """
     Any module where forward() takes embeddings as a second argument.
@@ -27,6 +70,137 @@ class EmbedBlock(nn.Module):
         """
         Apply the module to `x` given `emb` embeddings.
         """
+
+class ChannelAttention(nn.Module):
+    def __init__(self, channels, reduction):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(channels,channels//reduction),
+            nn.ReLU(),
+            nn.Linear(channels//reduction, channels)
+        )
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.maxpool = nn.AdaptiveMaxPool2d(1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x_avg = self.avgpool(x)
+        x_max = self.maxpool(x)
+        b, c , _, _ = x_avg.size()
+        x_avg = self.mlp(x_avg.view(b,c)).view(b, c, 1, 1)
+        x_max = self.mlp(x_max.view(b,c)).view(b,c,1,1)
+        x_out = self.sigmoid(x_max+x_avg) * x
+        return x_out
+
+class SpatialAttention(nn.Module):
+    def __init__(self, bias = False, window = 7):
+        super().__init__()
+        self.bias = bias
+        self.conv = nn.Conv2d(in_channels=2, out_channels=1,kernel_size=window, stride=1, padding='same', dilation=1, bias = self.bias)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x_avg = torch.mean(x,1, keepdim=True)
+        x_max = torch.max(x,1, keepdim=True)[0]
+        x_cat = torch.cat((x_max,x_avg), dim=1)
+        x_conv = self.conv(x_cat)
+        output = self.sigmoid(x_conv) * x
+        return output
+
+class CBAM_mod(nn.Module):
+    def __init__(self, channels, out_channels, reduction=4, bias = False, window = 7):
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels=10, out_channels=out_channels,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.channel_attention1 = ChannelAttention(out_channels, reduction)
+        self.spatial_attention1 = SpatialAttention(bias, window)
+        self.spatial_attention2 = SpatialAttention(bias, window)
+        self.spatial_attention3 = SpatialAttention(bias, window)
+
+    def forward(self, x):
+        img, sar = x[:,:3], x[:,3:]
+        output_img = self.spatial_attention1(img)
+        output_sar = self.spatial_attention2(sar)
+        output_map = torch.cat([output_img, output_sar, x], 1)
+        output = self.conv1(output_map)
+        output = self.channel_attention1(output)
+        output = self.spatial_attention3(output)
+        return output
+
+class CondNAFBlock(nn.Module):
+    def __init__(self, c, out_channel, DW_Expand=2, FFN_Expand=2, drop_out_rate=0.):
+        super().__init__()
+        dw_channel = c * DW_Expand
+        self.conv1 = nn.Conv2d(in_channels=c, out_channels=dw_channel,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.conv2 = nn.Conv2d(in_channels=dw_channel, out_channels=dw_channel, kernel_size=3, padding=1, stride=1, groups=dw_channel,
+                               bias=True)
+        self.conv3 = nn.Conv2d(in_channels=dw_channel // 2, out_channels=c,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+
+        # Simplified Channel Attention
+        # self.sca = nn.Sequential(
+        #     nn.AdaptiveAvgPool2d(1),
+        #     nn.Conv2d(in_channels=dw_channel // 2, out_channels=dw_channel // 2, kernel_size=1, padding=0, stride=1,
+        #               groups=1, bias=True),
+        # )
+        self.sca_avg = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(in_channels=dw_channel // 4, out_channels=dw_channel // 4, kernel_size=1, padding=0, stride=1,
+                      groups=1, bias=True),
+        )
+        self.sca_max = nn.Sequential(
+            nn.AdaptiveMaxPool2d(1),
+            nn.Conv2d(in_channels=dw_channel // 4, out_channels=dw_channel // 4, kernel_size=1, padding=0, stride=1,
+                      groups=1, bias=True),
+        )
+
+        # SimpleGate
+        self.sg = SimpleGate()
+
+        ffn_channel = FFN_Expand * c
+        self.conv4 = nn.Conv2d(in_channels=c, out_channels=ffn_channel,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+        self.conv5 = nn.Conv2d(in_channels=ffn_channel // 2, out_channels=out_channel,
+                               kernel_size=1, padding=0, stride=1, groups=1, bias=True)
+
+        self.norm1 = LayerNorm2d(c)
+        self.norm2 = LayerNorm2d(c)
+
+        self.dropout1 = nn.Dropout(
+            drop_out_rate) if drop_out_rate > 0. else nn.Identity()
+        self.dropout2 = nn.Dropout(
+            drop_out_rate) if drop_out_rate > 0. else nn.Identity()
+
+        self.beta = nn.Parameter(torch.zeros((1, c, 1, 1)), requires_grad=True)
+        self.gamma = nn.Parameter(torch.zeros(
+            (1, c, 1, 1)), requires_grad=True)
+
+    def forward(self, inp):
+        x = inp
+
+        x = self.norm1(x)#LN
+
+        x = self.conv1(x)#conv1x1
+        x = self.conv2(x)#DConv3x3
+        x = self.sg(x)#SSA
+        x_avg, x_max = x.chunk(2, dim=1)
+        x_avg = self.sca_avg(x_avg)*x_avg
+        x_max = self.sca_max(x_max)*x_max
+        x = torch.cat([x_avg, x_max], dim=1)
+        x = self.conv3(x)#
+
+        x = self.dropout1(x)
+
+        y = inp + x * self.beta
+
+        x = self.conv4(self.norm2(y))
+        x = self.sg(x)
+        x = self.conv5(x)
+
+        x = self.dropout2(x)
+
+        return y + x * self.gamma
 
 class EmbedSequential(nn.Sequential, EmbedBlock):
     """
@@ -354,7 +528,7 @@ class UNet(nn.Module):
         channel_mults=(1, 2, 4, 8),
         conv_resample=True,
         use_checkpoint=False,
-        use_fp16=False,
+        use_fp16=True,
         num_heads=1,
         num_head_channels=-1,
         num_heads_upsample=-1,
@@ -378,7 +552,7 @@ class UNet(nn.Module):
         self.channel_mults = channel_mults
         self.conv_resample = conv_resample
         self.use_checkpoint = use_checkpoint
-        self.dtype = torch.float16 if use_fp16 else torch.float32
+        self.dtype = torch.bfloat16 if use_fp16 else torch.float32
         self.num_heads = num_heads
         self.num_head_channels = num_head_channels
         self.num_heads_upsample = num_heads_upsample
@@ -389,8 +563,9 @@ class UNet(nn.Module):
             SiLU(),
             nn.Linear(cond_embed_dim, cond_embed_dim),
         )
-
+        self.cond_downs = nn.ModuleList()
         ch = input_ch = int(channel_mults[0] * inner_channel)
+        self.cond_encoders = nn.ModuleList([CBAM_mod(in_channel + 2, ch)])
         self.input_blocks = nn.ModuleList(
             [EmbedSequential(nn.Conv2d(in_channel, ch, 3, padding=1))]
         )
@@ -409,6 +584,9 @@ class UNet(nn.Module):
                         use_scale_shift_norm=use_scale_shift_norm,
                     )
                 ]
+                cond_layers = nn.Sequential(CondNAFBlock(ch, ch),
+                                  nn.Conv2d(ch, int(mult * inner_channel), 3, 1, padding=1))
+
                 ch = int(mult * inner_channel)
                 if ds in attn_res:
                     layers.append(
@@ -420,7 +598,15 @@ class UNet(nn.Module):
                             use_new_attention_order=use_new_attention_order,
                         )
                     )
+                    cond_layers.append(AttentionBlock(
+                            ch,
+                            use_checkpoint=use_checkpoint,
+                            num_heads=num_heads,
+                            num_head_channels=num_head_channels,
+                            use_new_attention_order=use_new_attention_order,)
+                    )
                 self.input_blocks.append(EmbedSequential(*layers))
+                self.cond_encoders.append(cond_layers)
                 self._feature_size += ch
                 input_block_chans.append(ch)
             if level != len(channel_mults) - 1:
@@ -441,6 +627,15 @@ class UNet(nn.Module):
                             ch, conv_resample, out_channel=out_ch
                         )
                     )
+                )
+                down_block = torch.nn.Sequential(
+                    CondNAFBlock(ch, ch),
+                    Downsample(
+                        ch, conv_resample, out_channel=out_ch
+                    )
+                )
+                self.cond_encoders.append(
+                        down_block
                 )
                 ch = out_ch
                 input_block_chans.append(ch)
@@ -522,7 +717,7 @@ class UNet(nn.Module):
             zero_module(nn.Conv2d(input_ch, out_channel, 3, padding=1)),
         )
 
-    def forward(self, x, gammas):
+    def forward(self, inp, gammas):
         """
         Apply the model to an input batch.
         :param x: an [N x 2 x ...] Tensor of inputs (B&W)
@@ -532,10 +727,12 @@ class UNet(nn.Module):
         hs = []
         gammas = gammas.view(-1, )  # [bs]
         emb = self.cond_embed(gamma_embedding(gammas, self.inner_channel)) # [bs, 64*4]
-
+        cond, x = inp[:, :5], inp[:, 5:]
         h = x.type(torch.float32)
-        for module in self.input_blocks:
+        for module, cond_module, in zip(self.input_blocks, self.cond_encoders):
             h = module(h, emb)
+            cond = cond_module(cond)
+            h = h + cond
             hs.append(h)
         h = self.middle_block(h, emb)
         for module in self.output_blocks:

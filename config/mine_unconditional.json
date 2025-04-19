@@ -12,7 +12,7 @@
         "tb_logger": "tb_logger",
         "results": "results",
         "checkpoint": "checkpoint",
-        "resume_state": "/home/vkon/hdd/diffcr-results/train_mine_250311_150700/checkpoint/"
+        "resume_state": ""
     },
     "datasets": {
         "train": {
@@ -85,7 +85,7 @@
             ],
             "args": {
                 "sample_num": 8,
-                "task": "decloud",
+                "task": "inpainting",
                 "ema_scheduler": {
                     "ema_start": 1,
                     "ema_iter": 1,
@@ -106,7 +106,7 @@
                 ],
                 "args": {
                     "init_type": "kaiming",
-                    "module_name": "mine_synthetic_sar_residual",
+                    "module_name": "mine_unconditional",
                     "unet": {
                         "img_channel": 3,
                         "width": 64,

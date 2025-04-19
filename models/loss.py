@@ -4,6 +4,9 @@ import torch.nn.functional as F
 from pandas.core.nanops import nanany
 from torch.autograd import Variable
 from pytorch_msssim import ssim
+
+import torchvision.models as models
+import torchvision.transforms as transforms
 # class mse_loss(nn.Module):
 #     def __init__(self) -> None:
 #         super().__init__()
@@ -68,6 +71,24 @@ def ssim_mse_loss(output, target, mask = None, coef = 1):
     ssimloss = ssim_loss(output,target, mask)['total']* coef
     return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'total': mseloss+ssimloss, 'ssim_mse_loss': mseloss+ssimloss }
 
+def vgg_loss(output, target):
+    vgg_loss = perc_loss.forward(output, target)
+    return {'vgg_loss':vgg_loss, 'total':vgg_loss}
+
+def ssim_mse_vgg_loss(output, target, mask = None, coef = 1):
+    """
+    coef: rate for mse loss
+    """
+    #tmp_output = (output * 0.5) + 0.5
+    #tmp_target = (target * 0.5) + 0.5
+    #tmp_output = torch.clip(tmp_output, 0, 1)
+    #tmp_target = F.softmax(target)
+    #tmp_output = F.softmax(output)
+    vggloss = vgg_loss(output, target)['total']
+    mseloss = mse_loss(output, target, mask)['total']
+    ssimloss = ssim_loss(output,target, mask)['total']* coef
+    return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'vgg_loss':vggloss, 'total': mseloss+ssimloss+vggloss}
+
 def ssim_mse_hist_loss(output, target, coef = 4):
     """
     coef: rate for mse loss
@@ -117,3 +138,35 @@ class FocalLoss(nn.Module):
         if self.size_average: return loss.mean()
         else: return loss.sum()
 
+class PerceptualLoss(nn.Module):
+    def __init__(self, layers=[3], use_normalization=True):
+        super(PerceptualLoss, self).__init__()
+        vgg = models.vgg16(pretrained=True).features[:max(layers)+1].eval().cuda()
+        for param in vgg.parameters():
+            param.requires_grad = False
+        self.vgg = vgg
+        self.layers = layers
+        self.criterion = nn.MSELoss()
+        self.normalize = use_normalization
+        if use_normalization:
+            self.norm = transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+
+    def forward(self, input, target):
+        if self.normalize:
+            input = self.norm(input)
+            target = self.norm(target)
+
+        loss = 0.0
+        x = input
+        y = target
+        for i, layer in enumerate(self.vgg):
+            x = layer(x)
+            y = layer(y)
+            if i in self.layers:
+                loss += self.criterion(x, y)
+        return loss
+
+perc_loss = PerceptualLoss(layers=[3, 8, 15 ,20])

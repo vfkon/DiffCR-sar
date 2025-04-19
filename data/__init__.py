@@ -7,7 +7,8 @@ from torch.utils.data import DataLoader, Subset
 
 import core.util as Util
 from core.praser import init_obj
-from data.dataset import Sen2_MTC_New_Multi, Sen2_MTC_New_Single, SEN12MS, SEN12OPTMS, SyntheticSEN12MS, SyntheticSARSEN12MS
+from data.dataset import Sen2_MTC_New_Multi, Sen2_MTC_New_Single, SEN12MS, SEN12OPTMS, SyntheticSEN12MS, \
+    SyntheticSARSEN12MS, SyntheticSEN12MS_v2, SyntheticSEN12MS_v3_mask
 
 
 def define_dataloader(logger, opt):
@@ -39,12 +40,12 @@ def define_dataset(logger, opt):
     ''' loading Dataset() class from given file's name '''
     dataset_opt = opt['datasets'][opt['phase']]['which_dataset']
     #phase_dataset = init_obj(dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')
-    phase_dataset = SyntheticSARSEN12MS(path = opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
+    phase_dataset = SyntheticSEN12MS_v2(path = opt['datasets'][opt['phase']]['which_dataset']['args']['data_root'],
                                        mode = dataset_opt['args']['mode'], rand_use = dataset_opt['args']['rand_use'], use_mask = dataset_opt['args']['use_mask'])
     #val_dataset = None
     val_dataset_opt = opt['datasets']['val']['which_dataset']
     #val_dataset = init_obj(val_dataset_opt, logger, default_file_name='data.dataset', init_type='Dataset')
-    val_dataset = SyntheticSARSEN12MS(opt['datasets']['val']['which_dataset']['args']['data_root'],
+    val_dataset = SyntheticSEN12MS_v2(opt['datasets']['val']['which_dataset']['args']['data_root'],
                                        'val', use_mask = dataset_opt['args']['use_mask'])
     valid_len = 0
     data_len = len(phase_dataset)

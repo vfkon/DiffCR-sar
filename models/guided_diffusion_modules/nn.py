@@ -10,7 +10,7 @@ import torch.nn as nn
 
 class GroupNorm32(nn.GroupNorm):
     def forward(self, x):
-        return super().forward(x.float()).type(x.dtype)
+        return super().forward(x.bfloat()).type(x.dtype)
 
 
 def zero_module(module):

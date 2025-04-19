@@ -1,7 +1,7 @@
 import torch.utils.data as data
 import torchvision.transforms
 from torchvision import transforms
-from PIL import Image
+from PIL import Image, ImageDraw
 import os
 import torch
 import random
@@ -15,6 +15,7 @@ import rasterio
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+import cv2
 
 import torch.utils.data as data
 
@@ -58,11 +59,11 @@ def augment_clear_image(image, percent=30, clear_image_percent=0.2):
     cover = np.random.rand()
     mask = torch.zeros_like(image)
     if cover < clear_image_percent:
-        return image, mask
+        return image, mask[0:1]
     _, img_height, img_width = image.shape
     total_pixels = img_height * img_width
     cloud_count = np.random.randint(low=0, high=3)
-    coverage_percent = np.random.randint(0.4 * percent, percent)
+    coverage_percent = np.random.randint(0.25 * percent, percent)
     target_coverage_pixels = int(total_pixels * (coverage_percent / 100))
     for i in range(cloud_count - 1):
         cloud_pix_count = random.randint(10, int(target_coverage_pixels * 0.5))
@@ -72,7 +73,6 @@ def augment_clear_image(image, percent=30, clear_image_percent=0.2):
         target_coverage_pixels = int(target_coverage_pixels)
         pos_y = random.randint(cloud_height, img_height - cloud_height)
         pos_x = random.randint(cloud_width, img_width - cloud_width)
-        image[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
         mask[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
     cloud_pix_count = target_coverage_pixels
     cloud_width = int(np.sqrt(cloud_pix_count))
@@ -80,9 +80,73 @@ def augment_clear_image(image, percent=30, clear_image_percent=0.2):
     # print(cloud_height)
     pos_y = random.randint(0, img_height - cloud_height)
     pos_x = random.randint(0, img_width - cloud_width)
-    image[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
+    image = image * (1. - mask) + mask * torch.ones_like(image)
     mask[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
-    return image, mask
+    return image, mask[0:1]
+
+def augment_clear_image_random(image, percent=30, clear_image_percent=0.2):
+    cover = np.random.rand()
+    mask = torch.zeros_like(image)
+    if cover < clear_image_percent:
+        return image, mask
+    _, img_height, img_width = image.shape
+    total_pixels = img_height * img_width
+    cloud_count = np.random.randint(low=0, high=3)
+    coverage_percent = np.random.randint(0.25 * percent, percent)
+    target_coverage_pixels = int(total_pixels * (coverage_percent / 100))
+    for i in range(cloud_count - 1):
+        cloud_pix_count = random.randint(10, int(target_coverage_pixels * 0.5))
+        cloud_width = int(np.sqrt(cloud_pix_count))
+        cloud_height = cloud_width
+        target_coverage_pixels -= cloud_width * cloud_height
+        target_coverage_pixels = int(target_coverage_pixels)
+        pos_y = random.randint(cloud_height, img_height - cloud_height)
+        pos_x = random.randint(cloud_width, img_width - cloud_width)
+        #image[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = np.
+        mask[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
+    cloud_pix_count = target_coverage_pixels
+    cloud_width = int(np.sqrt(cloud_pix_count))
+    cloud_height = cloud_width
+    # print(cloud_height)
+    pos_y = random.randint(0, img_height - cloud_height)
+    pos_x = random.randint(0, img_width - cloud_width)
+    mask[:, pos_x:pos_x + cloud_width, pos_y:pos_y + cloud_height] = torch.tensor([1.0, 1.0, 1.0]).view(3, 1, 1)
+    image = image*(1.-mask) + mask * torch.ones_like(image)#torch.randn_like(image)
+    return image, mask[0:1]
+
+def free_form_augment(image, lineCount, maxVertex, maxLength, maxBrushWidth, maxAngle):
+    mask = torch.zeros((image.shape[1], image.shape[2]), dtype = torch.uint8)
+    lines = np.random.randint(1,lineCount+1)
+    for j in range(lines):
+        num_vertex = np.random.randint(0, maxVertex + 1)
+        start_x = np.random.randint(0, image.shape[0])
+        start_y = np.random.randint(0, image.shape[1])
+        brush_width = np.random.randint(maxBrushWidth//2, maxBrushWidth)
+        pil_mask = Image.fromarray(mask.numpy())
+        imagedraw = ImageDraw.Draw(pil_mask)
+        for i in range(num_vertex):
+            angle = np.random.uniform(0,maxAngle)
+            if i%2==0:
+                angle = 180- angle
+            length = np.random.uniform(0, maxLength)
+            end_x = int(start_x  +length  *np.sin(angle * np.pi/180))
+            end_y = int(start_y + length * np.cos(angle* np.pi/180))
+            imagedraw.line((start_x, start_y, end_x, end_y), fill=255, width=brush_width)
+            imagedraw.ellipse((end_x- brush_width//2,end_y - brush_width//2, end_x+ brush_width//2,end_y + brush_width//2),
+                              fill = 255)
+            start_x = end_x
+            start_y = end_y
+        mask = torch.tensor(np.array(pil_mask), dtype=torch.uint8)
+        flip_code = np.random.randint(-1,2)
+        transpose = np.random.randint(0,2)
+        if flip_code<2:
+            if transpose:
+                mask = torch.transpose(mask,0,1)
+            mask = torch.flip(mask,(flip_code,))
+    mask = mask/255
+    mask = torch.stack([mask,mask,mask])
+    image = image * (1. - mask) + mask * torch.ones_like(image)#torch.randn_like(image)
+    return image, mask[0:1]
 
 
 def load_s2_normalized(path, use_hr, use_mr, use_lr):
@@ -101,7 +165,40 @@ def load_s2_normalized(path, use_hr, use_mr, use_lr):
     s2 /= 10000
     s2 = s2.astype(np.float32)
     s2 = torch.tensor(s2)
-    s2_cloud, mask = augment_clear_image(s2.clone().detach(), percent=20, clear_image_percent=0.2)
+    if np.random.choice([0,1]):
+        s2_cloud, mask = augment_clear_image(s2.clone().detach(), percent=30, clear_image_percent=0.2)
+    else:
+        s2_cloud, mask = free_form_augment(s2.clone().detach(), 5, 30, 70, 25, 10)
+    mean = torch.as_tensor([0.5]*len(bands_selected),
+                           dtype=s2.dtype, device=s2.device)
+    std = torch.as_tensor([0.5]*len(bands_selected),
+                          dtype=s2.dtype, device=s2.device)
+    if mean.ndim == 1:
+        mean = mean.view(-1, 1, 1)
+    if std.ndim == 1:
+        std = std.view(-1, 1, 1)
+    s2.sub_(mean).div_(std)
+    #s2_cloud.sub_(mean).div_(std)
+
+    return s2, s2_cloud, mask
+
+def load_s2_freeform(path, use_hr, use_mr, use_lr):
+    bands_selected = []
+    if use_hr:
+        bands_selected = bands_selected + S2_BANDS_HR
+    if use_mr:
+        bands_selected = bands_selected + S2_BANDS_MR
+    if use_lr:
+        bands_selected = bands_selected + S2_BANDS_LR
+    bands_selected = sorted(bands_selected)
+    with rasterio.open(path) as data:
+        s2 = data.read(bands_selected)
+    s2 = s2.astype(np.float32)
+    s2 = np.clip(s2, 0, 10000)
+    s2 /= 10000
+    s2 = s2.astype(np.float32)
+    s2 = torch.tensor(s2)
+    s2_cloud, mask = free_form_augment(s2, 4, 25, 70, 25, 10)
     mean = torch.as_tensor([0.5]*len(bands_selected),
                            dtype=s2.dtype, device=s2.device)
     std = torch.as_tensor([0.5]*len(bands_selected),
@@ -113,6 +210,8 @@ def load_s2_normalized(path, use_hr, use_mr, use_lr):
     s2.sub_(mean).div_(std)
     s2_cloud.sub_(mean).div_(std)
     return s2, s2_cloud, mask
+
+
 # util function for reading s2 data
 def load_s2(path, use_hr, use_mr, use_lr):
     bands_selected = []
@@ -368,6 +467,225 @@ def get_display_channels_opt(use_s2, use_s1):
         brightness_factor = 3
     return (display_channels, brightness_factor)
 
+class SyntheticSEN12MS_v3_mask(data.Dataset):
+    def __init__(self, path, mode="train", rand_use=0.0, no_savanna=False, use_s2hr=True,
+                 use_s2mr=False, use_s2lr=False, use_s2cr=False, use_s1=True, use_mask=False):
+        """Initialize the dataset"""
+
+        # inizialize
+        super(SyntheticSEN12MS_v3_mask, self).__init__()
+
+        # make sure parameters are okay
+        if not (use_s2hr or use_s2mr or use_s2lr or use_s1):
+            raise ValueError("No input specified, set at least one of "
+                             + "use_[s2hr, s2mr, s2lr, s1] to True!")
+        self.use_s2hr = use_s2hr
+        self.use_s2mr = use_s2mr
+        self.use_s2lr = use_s2lr
+        self.use_s2cr = use_s2cr
+        self.use_s1 = use_s1
+        self.no_savanna = no_savanna
+        self.use_mask = use_mask
+        assert mode in ["train", "val", "test"]
+
+        # provide number of input channels
+        self.n_inputs = get_ninputs(use_s1, use_s2hr, use_s2mr, use_s2lr)
+
+        # provide index of channel(s) suitable for previewing the input
+        self.display_channels, self.brightness_factor = get_display_channels(
+            use_s2hr,
+            use_s2mr,
+            use_s2lr)
+
+        # provide number of classes
+        if no_savanna:
+            self.n_classes = max(DFC2020_CLASSES) - 1
+            self.no_savanna = True
+        else:
+            self.n_classes = max(DFC2020_CLASSES)
+            self.no_savanna = False
+
+        # make sure parent dir exists
+        assert os.path.exists(path)
+
+        # find and index samples
+        self.samples = []
+
+        val_list = list(pd.read_csv(os.path.join(path,
+                                                 "SEN12MS_holdOutScenes.txt"),
+                                    header=None)[0])
+        val_list = [x.replace("s1_", "s2_") for x in val_list]
+        val_list = [x.replace('_s1', '_s2') for x in val_list]
+        # compile a list of paths to all samples
+        if mode == "train":
+            train_list = []
+            for seasonfolder in ['ROIs1970_fall_s2', 'ROIs1158_spring_s2',
+                                 'ROIs2017_winter_s2', 'ROIs1868_summer_s2']:
+                train_list += [os.path.join(seasonfolder, x) for x in
+                               os.listdir(os.path.join(path, seasonfolder))]
+            train_list = [x for x in train_list if "s2_" in x]
+            train_list = [x for x in train_list if x not in val_list]
+            sample_dirs = train_list
+        elif mode == "val" or mode == "test":
+            sample_dirs = val_list
+
+        for folder in sample_dirs:
+            s2_locations = glob.glob(os.path.join(path, f"{folder}/*.tif"),
+                                     recursive=True)
+
+            # INFO there is one "broken" file in the sen12ms dataset with nan
+            #      values in the s1 data. we simply ignore this specific sample
+            #      at this point. id: ROIs1868_summer_xx_146_p202
+            if folder == "ROIs1868_summer_s2/s2_146":
+                broken_file = os.path.join(path, "ROIs1868_summer_s2",
+                                           "s2_146",
+                                           "ROIs1868_summer_s2_146_p202.tif")
+                s2_locations.remove(broken_file)
+
+            for s2_loc in s2_locations:
+                s1_loc = s2_loc.replace("_s2_", "_s1_").replace("s2_", "s1_").replace('_s2',
+                                                                                      '_s1')
+                self.samples.append({"s2": s2_loc,
+                                     "s1": s1_loc,
+                                     "id": os.path.basename(s2_loc)})
+        # sort list of samples
+        self.samples = sorted(self.samples, key=lambda i: i['id'])
+        if mode == 'val':
+            self.samples = self.samples[:500]
+        print("loaded", len(self.samples),
+              "samples from the sen12ms subset", mode)
+
+    def __getitem__(self, index):
+        """Get a single example from the dataset"""
+
+        # get and load sample from index file
+        sample = self.samples[index]
+        image_cloud, image_sar, image_clear, image_label, image_mask = load_sample(sample, self.use_s1, self.use_s2hr, self.use_s2mr,
+                           self.use_s2lr, self.use_s2cr, self.use_mask, no_savanna=self.no_savanna,
+                           igbp=True, unlabeled=True)
+        ret = {}
+        ret['gt_image'] = image_clear[[2,1,0],:,:]
+        ret['cond_image_sar'] = image_sar
+        ret['cond_image'] = torch.cat([image_cloud[[2,1,0],:,:], image_sar, image_mask], dim=0)
+        ret['path'] = sample['id']
+      #  ret['mask'] = image_mask
+        return ret
+
+
+
+    def __len__(self):
+        """Get number of samples in the dataset"""
+        return len(self.samples)
+
+class SyntheticSEN12MS_v2(data.Dataset):
+    def __init__(self, path, mode="train", rand_use=0.0, no_savanna=False, use_s2hr=True,
+                 use_s2mr=False, use_s2lr=False, use_s2cr=False, use_s1=True, use_mask=False):
+        """Initialize the dataset"""
+
+        # inizialize
+        super(SyntheticSEN12MS_v2, self).__init__()
+
+        # make sure parameters are okay
+        if not (use_s2hr or use_s2mr or use_s2lr or use_s1):
+            raise ValueError("No input specified, set at least one of "
+                             + "use_[s2hr, s2mr, s2lr, s1] to True!")
+        self.use_s2hr = use_s2hr
+        self.use_s2mr = use_s2mr
+        self.use_s2lr = use_s2lr
+        self.use_s2cr = use_s2cr
+        self.use_s1 = use_s1
+        self.no_savanna = no_savanna
+        self.use_mask = use_mask
+        assert mode in ["train", "val", "test"]
+
+        # provide number of input channels
+        self.n_inputs = get_ninputs(use_s1, use_s2hr, use_s2mr, use_s2lr)
+
+        # provide index of channel(s) suitable for previewing the input
+        self.display_channels, self.brightness_factor = get_display_channels(
+            use_s2hr,
+            use_s2mr,
+            use_s2lr)
+
+        # provide number of classes
+        if no_savanna:
+            self.n_classes = max(DFC2020_CLASSES) - 1
+            self.no_savanna = True
+        else:
+            self.n_classes = max(DFC2020_CLASSES)
+            self.no_savanna = False
+
+        # make sure parent dir exists
+        assert os.path.exists(path)
+
+        # find and index samples
+        self.samples = []
+
+        val_list = list(pd.read_csv(os.path.join(path,
+                                                 "SEN12MS_holdOutScenes.txt"),
+                                    header=None)[0])
+        val_list = [x.replace("s1_", "s2_") for x in val_list]
+        val_list = [x.replace('_s1', '_s2') for x in val_list]
+        # compile a list of paths to all samples
+        if mode == "train":
+            train_list = []
+            for seasonfolder in ['ROIs1970_fall_s2', 'ROIs1158_spring_s2',
+                                 'ROIs2017_winter_s2', 'ROIs1868_summer_s2']:
+                train_list += [os.path.join(seasonfolder, x) for x in
+                               os.listdir(os.path.join(path, seasonfolder))]
+            train_list = [x for x in train_list if "s2_" in x]
+            train_list = [x for x in train_list if x not in val_list]
+            sample_dirs = train_list
+        elif mode == "val" or mode == "test":
+            sample_dirs = val_list
+
+        for folder in sample_dirs:
+            s2_locations = glob.glob(os.path.join(path, f"{folder}/*.tif"),
+                                     recursive=True)
+
+            # INFO there is one "broken" file in the sen12ms dataset with nan
+            #      values in the s1 data. we simply ignore this specific sample
+            #      at this point. id: ROIs1868_summer_xx_146_p202
+            if folder == "ROIs1868_summer_s2/s2_146":
+                broken_file = os.path.join(path, "ROIs1868_summer_s2",
+                                           "s2_146",
+                                           "ROIs1868_summer_s2_146_p202.tif")
+                s2_locations.remove(broken_file)
+
+            for s2_loc in s2_locations:
+                s1_loc = s2_loc.replace("_s2_", "_s1_").replace("s2_", "s1_").replace('_s2',
+                                                                                      '_s1')
+                self.samples.append({"s2": s2_loc,
+                                     "s1": s1_loc,
+                                     "id": os.path.basename(s2_loc)})
+        # sort list of samples
+        self.samples = sorted(self.samples, key=lambda i: i['id'])
+        if mode == 'val':
+            self.samples = self.samples[:500]
+        print("loaded", len(self.samples),
+              "samples from the sen12ms subset", mode)
+
+    def __getitem__(self, index):
+        """Get a single example from the dataset"""
+
+        # get and load sample from index file
+        sample = self.samples[index]
+        image_cloud, image_sar, image_clear, image_label, image_mask = load_sample(sample, self.use_s1, self.use_s2hr, self.use_s2mr,
+                           self.use_s2lr, self.use_s2cr, self.use_mask, no_savanna=self.no_savanna,
+                           igbp=True, unlabeled=True)
+        ret = {}
+        ret['gt_image'] = image_clear[[2,1,0],:,:]
+        ret['cond_image_sar'] = image_sar
+        ret['cond_image'] = torch.cat([image_cloud[[2,1,0],:,:], image_sar], dim=0)
+        ret['path'] = sample['id']
+      #  ret['mask'] = image_mask
+        return ret
+
+
+
+    def __len__(self):
+        """Get number of samples in the dataset"""
+        return len(self.samples)
 
 class SyntheticSEN12MS(data.Dataset):
     def __init__(self, path, mode="train", rand_use = 0.0, use_mask=False, no_savanna=False, use_s2hr=True,
@@ -1642,60 +1960,8 @@ class ColorizationDataset(data.Dataset):
 
 if __name__=='__main__':
     import numpy as np
-    def get_rgb_tensor(image):
-        image = image*0.5+0.5
-        rgb = image[:3, :, :]
-        rgb = rgb - torch.min(rgb)
-
-        # treat saturated images, scale values
-        if torch.max(rgb) == 0:
-            rgb = 255 * torch.ones_like(rgb)
-        else:
-            rgb = 255 * (rgb / torch.max(rgb))
-
-        rgb = rgb.type(torch.uint8)
-
-        # return rgb.float()
-        return rgb.permute(1, 2, 0).contiguous()
-    def get_rgb(image):
-        image = image.mul(0.5).add_(0.5)
-        image = image.squeeze()
-        image = image.mul(10000).add_(0.5).clamp_(0, 10000)
-        image = image.permute(1, 2, 0).cpu().detach().numpy()
-        image = image.astype(np.uint16)
-
-        r = image[:, :, 0]
-        g = image[:, :, 1]
-        b = image[:, :, 2]
-
-        r = np.clip(r, 0, 2000)
-        g = np.clip(g, 0, 2000)
-        b = np.clip(b, 0, 2000)
-
-        rgb = np.dstack((r, g, b))
-        rgb = rgb - np.nanmin(rgb)
-
-        if np.nanmax(rgb) == 0:
-            rgb = 255 * np.ones_like(rgb)
-        else:
-            rgb = 255 * (rgb / np.nanmax(rgb))
-
-        rgb[np.isnan(rgb)] = np.nanmean(rgb)
-        rgb = rgb.astype(np.uint8)
-
-        return rgb
-    for ret in Sen2_MTC_New("datasets", "val"):
-        # if ret["path"] == "T34TDT_R036_69.png":
-        #     img = ret['gt_image'].permute(1, 2, 0)[:, :, :3]
-        #     img = img.clamp_(*(-1, 1)).numpy()
-        #     # img = ((img+1) * 127.5).round()
-        #     img = img*10000
-        #     img = img.astype(np.uint8)
-        #     Image.fromarray(img).save("gt.png")
-        # import time
-        # t1 = time.time()
-        # img = get_rgb_tensor(ret['gt_image'])
-        # delta = time.time()-t1
-        # print(delta)
-        Image.fromarray(((ret['cond_image']*0.5+0.5)*255).permute(1, 2, 0).numpy().astype(np.uint8)).save("cond.png")
-        break
+    image = torch.zeros((1, 256,256))
+    for i in range(10000):
+        image, mask = free_form_augment(image, 4, 25, 70, 25, 10)
+        cv2.imshow("",image.permute(1,2,0).mul_(0.5).add_(0.5).numpy())
+        cv2.waitKey(0)

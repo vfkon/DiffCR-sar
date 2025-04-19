@@ -305,7 +305,7 @@ class UNet(nn.Module):
                 nn.Conv2d(chan, 2*chan, 2, 2)
             )
             self.cond_downs.append(
-                nn.Conv2d(chan, 2*chan, 2, 2)
+                nn.Conv2d(chan, 2 * chan, 2, 2)
             )
             chan = chan * 2
 

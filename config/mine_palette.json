@@ -1,0 +1,148 @@
+{
+    "name": "inpainting_places2", // experiments name
+    "gpu_ids": [0], // gpu ids list, default is single 0
+    "seed" : -1, // random seed, seed <0 represents randomization not used
+    "finetune_norm": false, // find the parameters to optimize
+    "autocast": true,
+    "path": { //set every part file path
+        "base_dir": "/media/vkon/hdd-data/diffcr-results",
+        "code": "code",
+        "tb_logger": "tb_logger",
+        "results": "results",
+        "checkpoint": "checkpoint",
+        "resume_state": ""
+    },
+
+    "datasets": {
+      // train or test
+      "train": {
+        "which_dataset": {
+          "name": [
+            "data.dataset",
+            "SyntheticSEN12MS_v2_mask"
+          ],
+          "args": {
+            "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
+            "mode": "train",
+            "rand_use": 0.0
+          }
+        },
+        "dataloader": {
+          "validation_split": 2,
+          "args": {
+            "batch_size": 8,
+            "num_workers": 4,
+            "shuffle": true,
+            "pin_memory": true,
+            "drop_last": true
+          },
+          "val_args": {
+            "batch_size": 1,
+            "num_workers": 1,
+            "shuffle": false,
+            "pin_memory": true,
+            "drop_last": false
+          }
+        }
+      },
+      "val": {
+        "which_dataset": {
+          "name": [
+            "data.dataset",
+            "SyntheticSEN12MS_v2_mask"
+          ],
+          "args": {
+            "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
+            "mode": "val"
+          }
+        }
+      }
+    },
+    "model": { // networks/metrics/losses/optimizers/lr_schedulers is a list and model is a dict
+        "which_model": { // import designated  model(trainer) using arguments
+            "name": ["models.model", "Palette"], // import Model() class / function(not recommend) from models.model.py (default is [models.model.py])
+            "args": {
+                "sample_num": 8, // process of each image
+                "task": "decloud",
+                "ema_scheduler": {
+                    "ema_start": 1,
+                    "ema_iter": 1,
+                    "ema_decay": 0.9999
+                },
+                "optimizers": [
+                    { "lr": 5e-5}
+                ]
+            }
+        },
+        "which_networks": [ // import designated list of networks using arguments
+            {
+                "name": [ "models.network_dpm_solver",
+                    "Network"], // import Network() class / function(not recommend) from default file (default is [models/network.py])
+                "args": { // arguments to initialize network
+                    "init_type": "kaiming", // method can be [normal | xavier| xavier_uniform | kaiming | orthogonal], default is kaiming
+                    "module_name": "guided_diffusion", // sr3 | guided_diffusion
+                    "unet": {
+                        "in_channel": 3,
+                        "out_channel": 3,
+                        "inner_channel": 64,
+                        "channel_mults": [
+                            1,
+                            2,
+                            4,
+                            8
+                        ],
+                        "attn_res": [
+                            // 32,
+                            16
+                            // 8
+                        ],
+                        "num_head_channels": 32,
+                        "res_blocks": 2,
+                        "dropout": 0.2,
+                        "image_size": 256
+                    },
+                    "beta_schedule": {
+                        "train": {
+                            "schedule": "sigmoid",
+                            "n_timestep": 2000,
+                            // "n_timestep": 5, // debug
+                            "linear_start": 1e-6,
+                            "linear_end": 0.01
+                        },
+                        "test": {
+                            "schedule": "sigmoid",
+                            "n_timestep": 1000,
+                            "linear_start": 1e-4,
+                            "linear_end": 0.09
+                        }
+                    }
+                }
+            }
+        ],
+        "which_losses":[
+            "ssim_mse_vgg_loss",
+            "vgg_loss",
+            "mse_loss",
+            "ssim_loss"
+        ],
+        "which_metrics": [
+            "mae",
+            "ssim_metric"
+        ]
+    },
+
+    "train": {
+        "n_epoch": 101,
+        "n_iter": 100000000,
+        "val_epoch": 1,
+        "save_checkpoint_epoch": 1,
+        "log_iter": 10000,
+        "tensorboard": true
+    },
+    "debug": {
+        "val_epoch": 1,
+        "savbbbbbbbbe_checkpoint_epoch": 1,
+        "log_iter": 1000,
+        "debug_split": 50
+    }
+}
