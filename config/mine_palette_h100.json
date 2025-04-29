@@ -19,7 +19,7 @@
         "which_dataset": {
           "name": [
             "data.dataset",
-            "SyntheticSEN12MS_v3_mask"
+            "SyntheticSEN12MS_v2_mask"
           ],
           "args": {
             "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
@@ -30,7 +30,7 @@
         "dataloader": {
           "validation_split": 2,
           "args": {
-            "batch_size": 8,
+            "batch_size": 12,
             "num_workers": 4,
             "shuffle": true,
             "pin_memory": true,
@@ -49,7 +49,7 @@
         "which_dataset": {
           "name": [
             "data.dataset",
-            "SyntheticSEN12MS_v3_mask"
+            "SyntheticSEN12MS_v2_mask"
           ],
           "args": {
             "data_root": "/home/vkon/datasets/SEN12MS-CR/SEN12MSCR",
@@ -76,7 +76,7 @@
         },
         "which_networks": [ // import designated list of networks using arguments
             {
-                "name": [ "models.network_dpm_solver",
+                "name": [ "models.network_x0_dpm_solver",
                     "Network"], // import Network() class / function(not recommend) from default file (default is [models/network.py])
                 "args": { // arguments to initialize network
                     "init_type": "kaiming", // method can be [normal | xavier| xavier_uniform | kaiming | orthogonal], default is kaiming
@@ -98,7 +98,7 @@
                         ],
                         "num_head_channels": 32,
                         "res_blocks": 1,
-                        "dropout": 0.0,
+                        "dropout": 0.2,
                         "image_size": 256
                     },
                     "beta_schedule": {

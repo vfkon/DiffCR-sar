@@ -71,8 +71,8 @@ def ssim_mse_loss(output, target, mask = None, coef = 1):
     ssimloss = ssim_loss(output,target, mask)['total']* coef
     return {'ssim_loss':ssimloss, 'mse_loss':mseloss, 'total': mseloss+ssimloss, 'ssim_mse_loss': mseloss+ssimloss }
 
-def vgg_loss(output, target):
-    vgg_loss = perc_loss.forward(output, target)
+def vgg_loss(output, target, coef = 0.05):
+    vgg_loss = perc_loss.forward(output, target)*coef
     return {'vgg_loss':vgg_loss, 'total':vgg_loss}
 
 def ssim_mse_vgg_loss(output, target, mask = None, coef = 1):
@@ -156,6 +156,8 @@ class PerceptualLoss(nn.Module):
 
     def forward(self, input, target):
         if self.normalize:
+            input = (input-input.min())/(input.max()-input.min())
+            target = (target - target.min())/(target.max()-target.min())
             input = self.norm(input)
             target = self.norm(target)
 

@@ -107,10 +107,10 @@ class Palette(BaseModel):
         ret_result = []
         for idx in range(self.batch_size):
             ret_path.append('GT_{}'.format(self.path[idx]))
-            ret_result.append(self.gt_image[idx].detach().float().cpu())
+            ret_result.append(self.get_rgb_tensor(self.gt_image[idx].detach().float().cpu()))
 
             ret_path.append('Cond_{}'.format(self.path[idx]))
-            ret_result.append(self.cond_image[idx,:3].detach().float().cpu())
+            ret_result.append(self.get_rgb_tensor(self.cond_image[idx,[0,1,2]].detach().float().cpu()))
 
             #ret_path.append('SAR1_{}'.format(self.path[idx]))
             #ret_result.append(self.cond_image[idx, 3].detach().float().cpu())
@@ -125,9 +125,9 @@ class Palette(BaseModel):
             # ret_result.append(self.visuals[idx::self.batch_size].detach().float().cpu())
             
             ret_path.append('Out_{}'.format(self.path[idx]))
-            ret_result.append(self.output[idx].detach().float().cpu())
+            ret_result.append(self.get_rgb_tensor(self.output[idx].detach().float().cpu()))
         
-        if self.task in ['inpainting','uncropping']:
+        if self.task in ['inpainting','uncroppibbbbng']:
             ret_path.extend(['Mask_{}'.format(name) for name in self.path])
             ret_result.extend(self.mask_image)
 

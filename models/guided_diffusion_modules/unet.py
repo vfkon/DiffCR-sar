@@ -528,7 +528,7 @@ class UNet(nn.Module):
         channel_mults=(1, 2, 4, 8),
         conv_resample=True,
         use_checkpoint=False,
-        use_fp16=True,
+        use_fp16=False,
         num_heads=1,
         num_head_channels=-1,
         num_heads_upsample=-1,
@@ -737,6 +737,7 @@ class UNet(nn.Module):
         h = self.middle_block(h, emb)
         for module in self.output_blocks:
             h = torch.cat([h, hs.pop()], dim=1)
+            #h = h + hs.pop()
             h = module(h, emb)
         h = h.type(x.dtype)
         return self.out(h)
