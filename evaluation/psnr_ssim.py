@@ -391,13 +391,19 @@ def calculate_ssim(img1,
 
 
 if __name__=='__main__':
-    src = "../0/GT"
-    dst = "../0/Out"
+    #src = "../0/GT"
+    #dst = "../0/Out"
+    path = '/media/vkon/hdd-data/experiments/250420/rect_freeform/results/test/0/'
+    imgs_gt = glob(path+'GT_*.*')
+    imgs_res = [x.replace('GT_', 'Cond_') for x in imgs_gt]
     psnr_list = []
     ssim_list = []
-    for i, j in tqdm(zip(glob(src + "/*"), glob(dst + "/*")), total=len(glob(src + "/*"))):
+    for i, j in tqdm(zip(imgs_res, imgs_gt), total=len(imgs_gt)):
         img1 = cv2.imread(i)
         img2 = cv2.imread(j)
+      #  cv2.imshow('1',img1)
+      #  cv2.imshow('2',img2)
+      #  cv2.waitKey()
         psnr = calculate_psnr(img1, img2, 0)
         ssim = calculate_ssim(img1, img2, 0)
         psnr_list.append(psnr)

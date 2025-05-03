@@ -1,25 +1,43 @@
 import torch
+import torchvision.transforms.functional
 from torch import nn
 from torch.autograd import Variable
 from torch.nn import functional as F
 import torch.utils.data
-
+from skimage.metrics import peak_signal_noise_ratio as compare_psnr
+from skimage.metrics import structural_similarity as compare_ssim
 from torchvision.models.inception import inception_v3
 from pytorch_msssim import ssim
 import numpy as np
+from PIL import Image
 from scipy.stats import entropy
 
 def mae(input, target):
+    input = (input + 1) / 2
+    target = (target + 1) / 2
+    range = max(input.max() - input.min(), target.max() - target.min())
     with torch.no_grad():
         loss = nn.L1Loss()
         output = loss(input, target)
+    output = output/range
     return output
 
 def ssim_metric(input, target):
+    #cssim_loss = ompare_ssim(input, target)
+    input = (input+1)/2
+    target = (target+1)/2
     with torch.no_grad():
-        ssim_loss = ssim((input+1)/2, (target+1)/2, data_range=1, size_average=True)
+        ssim_loss = ssim(input, target, data_range= max(input.max()-input.min(), target.max()-target.min()), size_average=True)
     return ssim_loss
 
+def psnr_metric(input, target):
+    input = (input + 1) / 2
+    target = (target + 1) / 2
+    range = max(input.max()-input.min(), target.max()-target.min())
+    input = np.array(input[0].cpu())
+    target = np.array(target[0].cpu())
+    _psnr = compare_psnr(input, target, data_range = range)
+    return _psnr
 
 def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1):
     """Computes the inception score of the generated images imgs

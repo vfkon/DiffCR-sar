@@ -4,7 +4,7 @@ import importlib
 from datetime import datetime
 import logging
 import pandas as pd
-
+import tifffile
 import core.util as Util
 
 class InfoLogger():

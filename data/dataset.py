@@ -18,7 +18,6 @@ from tqdm import tqdm
 import cv2
 
 import torch.utils.data as data
-
 MASKS = glob.glob('/media/vkon/hdd-data/datasets/test_dataset_rect_freeform/*.png')
 
 
@@ -579,7 +578,7 @@ class SyntheticSEN12MS_v3_mask(data.Dataset):
         sample = self.samples[index]
         image_cloud, image_sar, image_clear, image_label, image_mask = load_sample(sample, self.use_s1, self.use_s2hr, self.use_s2mr,
                            self.use_s2lr, self.use_s2cr, self.use_mask, no_savanna=self.no_savanna,
-                           igbp=True, unlabeled=True)
+                           igbp=True, unlabeled=True, index = index)
         ret = {}
         ret['gt_image'] = image_clear[[2,1,0],:,:]
         ret['cond_image_sar'] = image_sar
