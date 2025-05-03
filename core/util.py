@@ -32,6 +32,58 @@ def get_rgb(image): # CHW
     rgb = rgb.astype(np.uint8)
     return rgb
 
+def get_rgb_no_norm(image): # CHW
+    #image = image.mul(0.5).add_(0.5)
+    image = image.mul(10000).add_(0.5).clamp_(0, 10000)
+    image = image.permute(1, 2, 0).cpu().detach().numpy() # HWC
+    image = image.astype(np.uint16)
+
+    r = image[:, :, 0]
+    g = image[:, :, 1]
+    b = image[:, :, 2]
+
+    r = np.clip(r, 0, 2000)
+    g = np.clip(g, 0, 2000)
+    b = np.clip(b, 0, 2000)
+
+    rgb = np.dstack((r, g, b))
+    rgb = rgb - np.nanmin(rgb)
+
+    if np.nanmax(rgb) == 0:
+        rgb = 255 * np.ones_like(rgb)
+    else:
+        rgb = 255 * (rgb / np.nanmax(rgb))
+
+    rgb[np.isnan(rgb)] = np.nanmean(rgb)
+    rgb = rgb.astype(np.uint8)
+    return rgb
+
+
+def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)): # 可视化v2.0
+    '''
+    Converts a torch Tensor into an image Numpy array
+    Input: 4D(B,(3/1),H,W), 3D(C,H,W), or 2D(H,W), any range, RGB channel order
+    Output: 3D(H,W,C) or 2D(H,W), [0,255], np.uint8 (default)
+    '''
+    # tensor = tensor.clamp_(*min_max)  # clamp
+    n_dim = tensor.dim()
+    if n_dim == 4:
+        n_img = len(tensor)
+        img_np = make_grid([torch.from_numpy(get_rgb(tensor[i])).permute(2, 0, 1) for i in range(n_img)], nrow=int(
+            math.sqrt(n_img)), normalize=False).numpy()
+        img_np = np.transpose(img_np, (1, 2, 0))  # HWC, RGB
+    elif n_dim == 3:
+        if tensor.shape[0]==2:
+            tensor = tensor[0]
+            img_np = tensor.numpy()
+        else:
+            img_np = get_rgb(tensor)
+    elif n_dim == 2:
+        img_np = tensor.numpy()
+    else:
+        raise TypeError(
+            'Only support 4D, 3D and 2D tensor. But received with dimension: {:d}'.format(n_dim))
+    return img_np
 
 def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)): # 可视化v2.0
     '''

@@ -69,7 +69,7 @@ class Palette(BaseModel):
     
     def get_rgb_tensor(self, rgb):
         rgb = rgb*0.5+0.5
-        rgb = rgb - torch.min(rgb)
+        rgb = rgb - torch.min(rgb)/(torch.max(rgb)-torch.min(rgb))
         #print(rgb.min())
         #print(rgb.max())
 
@@ -77,7 +77,7 @@ class Palette(BaseModel):
         if torch.max(rgb) == 0:
             rgb = 255 * torch.ones_like(rgb)
         else:
-            rgb = 255 * (rgb / torch.max(rgb))
+            rgb = 255 * rgb / torch.max(rgb)
         if rgb.shape[0]==1:
             rgb = torch.concat([rgb,rgb,rgb],dim=0)
         return rgb.type(torch.uint8)
@@ -107,16 +107,19 @@ class Palette(BaseModel):
         ret_result = []
         for idx in range(self.batch_size):
             ret_path.append('GT_{}'.format(self.path[idx]))
-            ret_result.append(self.get_rgb_tensor(self.gt_image[idx].detach().float().cpu()))
-
+            ret_result.append(self.gt_image[idx].detach().float().cpu())
+            #print(self.gt_image[idx].detach().float().cpu().max())
+            #print(self.gt_image[idx].detach().float().cpu().min())
             ret_path.append('Cond_{}'.format(self.path[idx]))
-            ret_result.append(self.get_rgb_tensor(self.cond_image[idx,[0,1,2]].detach().float().cpu()))
-
-            #ret_path.append('SAR1_{}'.format(self.path[idx]))
-            #ret_result.append(self.cond_image[idx, 3].detach().float().cpu())
-
-            #ret_path.append('SAR2_{}'.format(self.path[idx]))
-            #ret_result.append(self.cond_image[idx, 4].detach().float().cpu())
+            ret_result.append(self.cond_image[idx,[0,1,2]].detach().float().cpu())
+            #print(self.cond_image[idx,[0,1,2]].detach().float().cpu().max())
+            #print(self.cond_image[idx,[0,1,2]].detach().float().cpu().min())
+            """ ret_path.append('SAR1_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx, 3].detach().float().cpu())
+            print(self.cond_image[idx, 3].detach().float().cpu().max())
+            print(self.cond_image[idx, 3].detach().float().cpu().min())
+            ret_path.append('SAR2_{}'.format(self.path[idx]))
+            ret_result.append(self.cond_image[idx, 4].detach().float().cpu())"""
 
             #ret_path.append('Cond_{}'.format(self.path[idx]))
             #ret_result.append(self.cond_image[idx].detach().float().cpu())
@@ -125,11 +128,13 @@ class Palette(BaseModel):
             # ret_result.append(self.visuals[idx::self.batch_size].detach().float().cpu())
             
             ret_path.append('Out_{}'.format(self.path[idx]))
-            ret_result.append(self.get_rgb_tensor(self.output[idx].detach().float().cpu()))
+            ret_result.append(self.output[idx].detach().float().cpu())
+            #print(self.output[idx].detach().float().cpu().max())
+            #print(self.output[idx].detach().float().cpu().min())
         
         if self.task in ['inpainting','uncroppibbbbng']:
             ret_path.extend(['Mask_{}'.format(name) for name in self.path])
-            ret_result.extend(self.mask_image)
+            ret_result.extend(self.get_rgb_tensor(self.mask_image))
 
         self.results_dict = self.results_dict._replace(name=ret_path, result=ret_result)
         return self.results_dict._asdict()

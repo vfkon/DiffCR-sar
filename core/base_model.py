@@ -111,12 +111,13 @@ class BaseModel():
         self.logger.info('Beign loading pretrained model [{:s}] ...'.format(network_label))
 
         if 'ema' in network_label:
-            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '20_Network_ema')
+            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '45_Network_ema')
         else:
-            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '20_Network')
+            model_path = "{}/{}.pth".format(self.opt['path']['resume_state'], '45_Network')
         
         if not os.path.exists(model_path):
             self.logger.warning('Pretrained model in [{:s}] is not existed, Skip it'.format(model_path))
+            exit(228)
             return
 
         self.logger.info('Loading pretrained model from [{:s}] ...'.format(model_path))
