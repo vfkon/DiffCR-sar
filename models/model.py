@@ -227,6 +227,7 @@ class Palette(BaseModel):
                 self.iter += self.batch_size
                 self.writer.set_iter(self.epoch, self.iter, phase='test')
                 for met in self.metrics:
+
                     key = met.__name__
                     value = met(self.gt_image, self.output)
                     self.test_metrics.update(key, value)

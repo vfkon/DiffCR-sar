@@ -15,7 +15,7 @@ from scipy.stats import entropy
 def mae(input, target):
     input = (input + 1) / 2
     target = (target + 1) / 2
-    range = max(input.max() - input.min(), target.max() - target.min())
+    range = max(input.max(), target.max()) - min(input.min(), target.min())
     with torch.no_grad():
         loss = nn.L1Loss()
         output = loss(input, target)
@@ -27,15 +27,15 @@ def ssim_metric(input, target):
     input = (input+1)/2
     target = (target+1)/2
     with torch.no_grad():
-        ssim_loss = ssim(input, target, data_range= max(input.max()-input.min(), target.max()-target.min()), size_average=True)
+        ssim_loss = ssim(input, target, data_range= max(input.max(), target.max()) - min(input.min(), target.min()), size_average=True)
     return ssim_loss
 
 def psnr_metric(input, target):
     input = (input + 1) / 2
     target = (target + 1) / 2
-    range = max(input.max()-input.min(), target.max()-target.min())
-    input = np.array(input[0].cpu())
-    target = np.array(target[0].cpu())
+    range = max(input.max(), target.max()) - min(input.min(), target.min())
+    input = np.array(input.cpu())
+    target = np.array(target.cpu())
     _psnr = compare_psnr(input, target, data_range = range)
     return _psnr
 

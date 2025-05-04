@@ -18,7 +18,7 @@ from tqdm import tqdm
 import cv2
 
 import torch.utils.data as data
-MASKS = glob.glob('/media/vkon/hdd-data/datasets/test_dataset_rect_freeform/*.png')
+MASKS = glob.glob('/media/vkon/hdd-data/datasets/test_dataset_rect/*.png')
 
 
 # from .util.mask import (bbox2mask, brush_stroke_mask,
